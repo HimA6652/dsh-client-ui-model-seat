@@ -127,13 +127,14 @@ comes back.
 
 ## Install
 
-    dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # from source (works today)
+    dsh plugin add dsh-client-ui-model-seat                              # from the registry (0.1.2+)
+    dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # from source
     dsh plugin add link:/absolute/path/to/dsh-client-ui-model-seat       # local checkout
 
-The npm channel is not open yet: this package has no registry release, so
-`dsh plugin add dsh-client-ui-model-seat` will fail with `404` until it does. Use
-the GitHub install above. Once published, the same command resolves from the
-registry without any change on your side.
+Both channels ship the same tree. The npm page is
+[npmjs.com/package/dsh-client-ui-model-seat](https://www.npmjs.com/package/dsh-client-ui-model-seat);
+the first release on it is `0.1.2`. A pnpm profile with `minimumReleaseAge` may
+ask once before accepting a version published in the last day.
 
 The plugin bundle inserts one row into the profile (`id: model-seat`) and
 registers its seat at `priority: -2`, so a leftover copy of either original

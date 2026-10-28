@@ -545,14 +545,17 @@ npm run live -- --url "http://127.0.0.1:6124/?token=…"
 ### 17.1 装（web / 普通 profile）
 
 ```bash
-# 从公开仓库（用户走这条；已实测可装）
+# 从 npm（0.1.2 起；实测 2.7 s，零依赖）
+node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add dsh-client-ui-model-seat
+
+# 从公开仓库（同样实测可装）
 node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add github:HimA6652/dsh-client-ui-model-seat
 
 # 从本地工作区（开发时用这条，改完要重启应用才生效）
 node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add link:/path/to/dsh-client-ui-model-seat
 ```
 
-npm 通道尚未开通（`npm view dsh-client-ui-model-seat` 是 404），所以 `add dsh-client-ui-model-seat` 目前会失败——首次 `npm publish` 之后才成立。
+npm 通道自 `0.1.2` 起开通（`npm view dsh-client-ui-model-seat version` → `0.1.2`，maintainer `hima6652`）。首次发布时 registry 会顺手建一个 `0.0.0-stage` 占位版本，已用 `npm deprecate` 标注说明，装版不会选中它。
 
 ### 17.2 装（desktop profile）
 
@@ -691,13 +694,18 @@ npm run release 0.2.0 --no-push     # 提交 + 标签，不推
 | 推了标签、Actions 失败 | 没有 Release 页 | 修好 workflow 重跑，或本地 `gh release create --verify-tag` |
 | 发出去的版本有 bug | 已有人装 | 不发 `npm unpublish`，改 CHANGELOG 发补丁版本 |
 
+首次发布（0.1.2）踩到的两个坑，记在这里免得下次当成事故：
+
+- `npm publish` 打印 `+ pkg@x.y.z` 与 "being processed and may take a few minutes" 之后，注册表 packument 会先只有一条 `0.0.0-stage`（描述写着 "Temporary package placeholder for staged publishing"），大约 1 分钟后真版本才落到 `dist-tags.latest`。**不要因此重跑 publish**，用 `npm view <pkg> version` 复核即可。这个占位版本用 `npm deprecate <pkg>@0.0.0-stage "<说明>"` 标注，别 `unpublish`。
+- pnpm 11 默认带 `minimumReleaseAge`，刚发出去的版本会被写进 profile 的 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude` 才能装；开了 `minimumReleaseAgeStrict` 的 profile 会先弹一次确认。这是 pnpm 的供应链保护，不是插件问题。
+
 ### 19.6 渠道对齐（本仓库实际开了几个）
 
 | 渠道 | 现状 | 对齐要求 |
 | --- | --- | --- |
-| git 标签 | `v0.1.1` 已推（annotated，peeled `fb00828`） | 与 `package.json` 的 `version` 一致 |
+| git 标签 | `v0.1.2` 已推（annotated `4ca9f6b`，peeled `eb8ba43`） | 与 `package.json` 的 `version` 一致 |
 | GitHub Release | 由 `.github/workflows/release.yml` 在 `v*` 标签上自动创建，正文取 `CHANGELOG.md` 同版本小节 | 发之前把正文里的旧措辞重扫一遍 |
-| npm | **未发布**（`npm view dsh-client-ui-model-seat` → 404）；README 的安装段已按“当前只有 GitHub 通道”写 | 首次 `npm publish` 之后，`dsh plugin add dsh-client-ui-model-seat` 才成立 |
+| npm | 已发布 `0.1.2`（2026-10-28T06:38Z）；`0.0.0-stage` 是首次发布的占位版本，已 deprecate | 用 `npm run release <ver>` 发，tag / Release / npm 三者同号 |
 | dsh 插件市场 | 尚未提 PR（见 `MARKET.md`） | 提 PR 前先克隆 `awesome-dsh-plugin` 跑它自己的校验脚本 |
 
 ### 19.7 已记录的决策

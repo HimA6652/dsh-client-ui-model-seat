@@ -1,0 +1,9 @@
+# The plugin row this bundle inserts into the profile.
+#
+# `id` is the row id the profile shows, and it is deliberately new: the two
+# plugins this one replaces shipped `gpt-helper` and `dsh-model-provider-prefix`,
+# and copying either id would collide with a row already present in a profile
+# that still has the original installed.
+- insert:
+    - id: model-seat
+      name: dsh-client-ui-model-seat

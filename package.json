@@ -1,0 +1,75 @@
+{
+  "name": "dsh-client-ui-model-seat",
+  "version": "0.1.1",
+  "license": "MIT",
+  "author": "HimA6652",
+  "contributors": [
+    "AprilCrystal (dsh-client-ui-gpt-helper)",
+    "zszz3 (dsh-model-provider-prefix)"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HimA6652/dsh-client-ui-model-seat.git"
+  },
+  "homepage": "https://github.com/HimA6652/dsh-client-ui-model-seat#readme",
+  "bugs": {
+    "url": "https://github.com/HimA6652/dsh-client-ui-model-seat/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "dsh-plugin",
+    "client-plugin",
+    "ui",
+    "composer",
+    "model-selection",
+    "reasoning-effort",
+    "model-provider-prefix",
+    "gpt-helper",
+    "theming"
+  ],
+  "description": "Composer model + thinking seat for DeepSeek Harness: provider/model columns and the particle effort slider, in one control.",
+  "type": "module",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "screenshots.json",
+    "assets"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.2"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "validate": "node scripts/validate-plugin.mjs",
+    "loadcheck": "node scripts/loadcheck.mjs",
+    "css": "node scripts/css-audit.mjs",
+    "e2e": "node scripts/browser-check.mjs",
+    "live": "node scripts/live-check.mjs",
+    "check": "npm run validate && npm run css && npm run loadcheck && npm test",
+    "check:all": "npm run check && npm run e2e",
+    "shots": "node scripts/shots.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-model-selection"
+      ]
+    }
+  }
+}

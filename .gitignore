@@ -1,0 +1,5 @@
+node_modules/
+.shots/
+.research/
+.tmp-*.log
+*.tgz

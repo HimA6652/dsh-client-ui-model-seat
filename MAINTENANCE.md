@@ -735,16 +735,16 @@ npm run release 0.2.0 --no-push     # 提交 + 标签，不推
 
 | 渠道 | 现状 | 对齐要求 |
 | --- | --- | --- |
-| git 标签 | `v0.1.2` 已推（annotated `4ca9f6b`，peeled `eb8ba43`） | 与 `package.json` 的 `version` 一致 |
+| git 标签 | `v0.2.0` 已推（annotated `fa57ea3`，peeled `9b13e9a`）；此前 `v0.1.2` annotated `4ca9f6b` / peeled `eb8ba43` | 与 `package.json` 的 `version` 一致 |
 | GitHub Release | 由 `.github/workflows/release.yml` 在 `v*` 标签上自动创建，正文取 `CHANGELOG.md` 同版本小节 | 发之前把正文里的旧措辞重扫一遍 |
-| npm | 已发布 `0.1.2`（2026-10-28T06:38Z）；`0.0.0-stage` 是首次发布的占位版本，已 deprecate | 用 `npm run release <ver>` 发，tag / Release / npm 三者同号 |
+| npm | 已发布 `0.2.0`（2026-10-28T10:37:58Z，13 文件 232.7 kB）与 `0.1.2`（06:38:18Z）；`0.0.0-stage` 是首次发布的占位版本，已 deprecate | 用 `npm run release <ver>` 发，tag / Release / npm 三者同号 |
 | dsh 插件市场 | 尚未提 PR（见 `MARKET.md`） | 提 PR 前先克隆 `awesome-dsh-plugin` 跑它自己的校验脚本 |
 
 ### 19.7 已记录的决策
 
 - **不改写 git 历史**。首次推送用了 `git add -A` 与散文式提交说明，当时没有任何 npm 制品，改写历史的收益低于风险。从现在起按规范提交，历史留档；这条决定本身写在这里，免得下一个人以为是忘了。
 - **`v0.1.1` 标签早于 `CHANGELOG.md`**。当时的 Release 正文是手写的。**不要**移动或重打 `v0.1.1`：下一个版本号走 `release.mjs`，三条渠道重新对齐。
-- **下一个版本号用 `0.1.2` 或更高**，让“有 CHANGELOG 的 Release”和“没有的”区分得开。
+- **带 CHANGELOG 的 Release 从 `0.1.2` 起**。`0.1.2`、`0.2.0` 都是 `release.mjs` 发的、正文取自 CHANGELOG；下一个版本号从 `0.2.1` 起。
 - **“先不发”是四层意思**：① 不写版本说明 ② 不提交 ③ 不推送 ④ 不打标签/不发 npm。听到这四个字先问是哪一层，默认按 ①+② 处理（改完留在工作区）。
 
 ### 19.8 提交信息规范
@@ -759,3 +759,24 @@ type(scope): 一句话，50-70 字符，句尾不加句号
 - 一行只讲一件事；写问题和改法，不写“我为什么这样想”。
 - 提交信息是公开页面：不出现分支名、人名、会话号。
 - 例：`fix(client): freeze card height so hover cannot resize it`。
+
+### 19.9 Actions 红了怎么查
+
+job 日志（`/actions/runs/<run>/logs`）和 artifact 下载都要登录，而本机的 HTTPS 凭据属于另一个没有 push 权限的账号，所以「打开页面看日志」这条路在命令行里是断的。免登录还能读的是 **check-run annotations**：
+
+```bash
+# 1) 拿最新 run 的结论
+node -e "fetch('https://api.github.com/repos/HimA6652/dsh-client-ui-model-seat/actions/runs?per_page=3',{headers:{'user-agent':'x'}}).then(r=>r.json()).then(j=>j.workflow_runs.forEach(r=>console.log(r.head_sha.slice(0,7),r.status,r.conclusion,r.id)))"
+# 2) 拿 job 的 id，再读它这一层的 annotations（注意是 job id，不是 step id）
+node -e "fetch('https://api.github.com/repos/HimA6652/dsh-client-ui-model-seat/actions/runs/<run>/jobs',{headers:{'user-agent':'x'}}).then(r=>r.json()).then(j=>j.jobs.forEach(x=>console.log(x.name,x.id)));"
+node -e "fetch('https://api.github.com/repos/HimA6652/dsh-client-ui-model-seat/check-runs/<job>/annotations',{headers:{'user-agent':'x'}}).then(r=>r.json()).then(a=>a.forEach(x=>console.log(x.annotation_level,'|',x.message)))"
+```
+
+```powershell
+# 日志要走认证；没有 gh 时用已存的 git 凭据也能读（该账号只读，够用）
+$env:GITHUB_TOKEN = '...'   # 只读 token 即可；本机现存凭据是 ylh440104，不能建 token
+```
+
+因此 `ci.yml` 的两个 e2e 步骤在失败时会把日志里匹配 `"the ` / `threw` / `browser-check:` / `no react vendor` / `never opened port` / `"problems"` 的那几行 `::error::` 出来 —— 断言失败的具体文案就靠在 annotation 里。
+
+首跑（run `40673400351`）红的就是这条链路的第一个真发现：runner 的系统开了「减少动效」，`prefers-reduced-motion: reduce` 让 `.gptm-particle` 的 `animation-name` 算成 `none`，「粒子以满强度漂移」被误判。修法是两边都显式 `Emulation.setEmulatedMedia` 钉住 `prefers-reduced-motion`，并把 `reduce` 分支写成反向断言（见 `browser-check` 第 5b 段）。**本地绿 / CI 红**时优先怀疑三件事：媒体特性默认值、慢机器上的采样帧数、Node 版本差异（CI 用 22，本机 24）。

@@ -37,4 +37,8 @@ Both upstreams are MIT. `LICENSE` keeps their copyright lines (AprilCrystal 2026
 
 ## For maintainers, if you would rather cap the list
 
-Happy to see this entry replace the two upstreams. If you prefer that, I can open a follow-up PR setting `deprecated: true` + `replacement: https://github.com/HimA6652/dsh-client-ui-model-seat` on `AprilCrystal__dsh-client-ui-gpt-helper.yml` and `zszz3__dsh-model-provider-prefix.yml` (one PR ≤ 3 entries), or you can do it directly in this one — say which you prefer.
+Happy to see this entry replace the two upstreams. Since entry files only accept
+`url / name / category / description / icon / tarball`, there is no way for me to
+mark them deprecated from here — if you'd prefer the list capped, delisting those
+two entries is your call, and I won't object. The PR itself stays a single
+addition either way.

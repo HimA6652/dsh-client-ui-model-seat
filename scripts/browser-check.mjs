@@ -177,7 +177,14 @@ session = (await send('Target.attachToTarget', { targetId, flatten: true })).ses
 await send('Page.enable', {}, session)
 await send('Runtime.enable', {}, session)
 await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false }, session)
-await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: SCHEME }] }, session)
+// Both media features are pinned: a CI runner whose OS has "reduce motion"
+// switched on would otherwise report animation-name: none and look like a bug
+// in the bundle. Section 5b exercises the reduce branch on purpose.
+const MEDIA = [
+  { name: 'prefers-color-scheme', value: SCHEME },
+  { name: 'prefers-reduced-motion', value: 'no-preference' },
+]
+await send('Emulation.setEmulatedMedia', { features: MEDIA }, session)
 await send('Page.navigate', { url }, session)
 
 let ready = false
@@ -630,6 +637,35 @@ try {
     JSON.stringify(afterKey.selections),
   )
 
+  // ═══ 5b. reduced motion: the drift stops, then comes back ═════════════════
+  // CI run 40673400351 proved this branch needs testing from both sides: the
+  // runner evaluates prefers-reduced-motion: reduce, so the drift assertion
+  // above saw animation-name: none and the job went red on a healthy bundle.
+  const READ_MOTION =
+    '(function () {\n' +
+    '  var p = document.querySelector(".gptm-particle")\n' +
+    '  var m = document.querySelector(' + CARD_Q + ')\n' +
+    '  return {\n' +
+    '    particle: p === null ? null : { name: getComputedStyle(p).animationName, opacity: Number(getComputedStyle(p).opacity) },\n' +
+    '    card: m === null ? null : getComputedStyle(m).animationName,\n' +
+    '    running: p !== null && p.getAnimations ? p.getAnimations().length : null,\n' +
+    '  }\n' +
+    '})()'
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: SCHEME }, { name: 'prefers-reduced-motion', value: 'reduce' }] }, session)
+  await sleep(150)
+  const calm = await evaluate(READ_MOTION)
+  check('reduced motion stops the drift', calm.particle !== null && calm.particle.name === 'none', JSON.stringify(calm))
+  check('reduced motion parks the particles at 0.35', calm.particle !== null && Math.abs(calm.particle.opacity - 0.35) < 0.02, JSON.stringify(calm))
+  check('reduced motion drops the card entrance', calm.card === 'none', JSON.stringify(calm))
+  await send('Emulation.setEmulatedMedia', { features: MEDIA }, session)
+  await sleep(150)
+  const resumed = await evaluate(READ_MOTION)
+  check(
+    'the drift resumes when motion is allowed',
+    resumed.particle !== null && resumed.particle.name === 'gptm-drift' && resumed.running === 1,
+    JSON.stringify(resumed),
+  )
+
   // Fast mode has no switch left: the bolt, its lock and the long press are gone,
   // and the trail runs unconditionally. What is left to probe in the head is the
   // reset button beside the status title.
@@ -720,6 +756,7 @@ try {
     scheme: SCHEME,
     thinking: { slider: effort.slider, max: effort.max, now: effort.now, ticks: effort.ticks, hints: effort.hints },
     pane: { pane: effort.pane, box: effort.box, contrast: effort.contrast },
+    motion: { reduced: calm, resumed },
     problems,
     shots,
   }

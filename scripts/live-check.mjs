@@ -125,6 +125,11 @@ const targetId = created.targetId
 const session = (await send('Target.attachToTarget', { targetId, flatten: true })).sessionId
 await send('Page.enable', {}, session)
 await send('Runtime.enable', {}, session)
+// The drift assertion below reads animation-name, which is 'none' when the
+// machine (or a CI runner) has "reduce motion" switched on. Pin the feature the
+// same way the fixture check does, and leave prefers-color-scheme alone: the
+// real profile decides the theme.
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] }, session)
 await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, session)
 
 // Attribute selectors inside generated expressions use unquoted values
@@ -403,6 +408,18 @@ try {
       pane.particles === 42 && pane.drift !== null && pane.drift.name === 'gptm-drift' && pane.drift.spin === '1' && pane.drift.running === 1,
       JSON.stringify({ particles: pane.particles, drift: pane.drift }),
     )
+    // Same branch as the fixture check: honour reduce, then come back.
+    const READ_MOTION =
+      '(function () { var p = document.querySelector(".gptm-particle"); return p === null ? null : { name: getComputedStyle(p).animationName, opacity: Number(getComputedStyle(p).opacity), running: p.getAnimations ? p.getAnimations().length : null } })()'
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, session)
+    await sleep(150)
+    const calm = await evaluate(READ_MOTION)
+    check('reduced motion stops the drift', calm !== null && calm.name === 'none', JSON.stringify(calm))
+    check('reduced motion parks the particles at 0.35', calm !== null && Math.abs(calm.opacity - 0.35) < 0.02, JSON.stringify(calm))
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] }, session)
+    await sleep(150)
+    const resumed = await evaluate(READ_MOTION)
+    check('the drift resumes when motion is allowed', resumed !== null && resumed.name === 'gptm-drift' && resumed.running === 1, JSON.stringify(resumed))
     check('the thinking pane keeps one frozen height', typeof pane.height === 'number', String(pane.height))
     check('the card shrinks to the thinking pane', pane.box.height < 300, JSON.stringify(pane.box))
     check('the pane icon reads on the card surface', pane.contrast.reset >= 3, JSON.stringify(pane.contrast))

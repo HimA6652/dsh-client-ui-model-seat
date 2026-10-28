@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **e2e 在「系统开了减少动效」的机器上误判**。`prefers-reduced-motion: reduce` 会把 `.gptm-particle` 的 `animation-name` 算成 `none`，于是「粒子以满强度漂移」这条断言在健康的 bundle 上失败 —— CI 首跑（run `40673400351`）就是这么红的，而本机是 `no-preference`，所以本地永远绿。现在 `browser-check` 与 `live-check` 都显式把 `prefers-reduced-motion` 钉成 `no-preference`，并新增反向断言：切到 `reduce` 时漂移停、粒子停在 `0.35`、卡片入场动画也停，切回来立刻恢复。
+
+### Changed
+
+- CI 的两个 e2e 步骤在失败时把报告里失败的那几行 `::error::` 成 check-run annotation（公开仓库的 job 日志要登录才能下载，annotations 免登录可读），artifact 另外收 `e2e-*.log`。
+
 ## [0.2.0] - 2026-10-28
 
 **破坏性变更**：快速模式的开关与 `600 ms` 长按锁整套删除，粒子滑轨的漂移改为**常开**。界面与 0.1.2 相比少了一个闪电按钮与面板头部的一个开关，卡片几何、存储键、DOM 钩子都没变，不需要重装或迁移。

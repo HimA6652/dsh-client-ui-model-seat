@@ -1,0 +1,65 @@
+name: CI
+
+# 每次推到 main 和每个 PR 都跑一遍：自检 + 真实浏览器 e2e。
+# 用 windows-latest 是因为 e2e 走 CDP 驱动本机 Edge，镜像自带 msedge.exe，
+# 不需要装 Playwright 或下载浏览器（仓库没有 runtime 依赖，也就不需要 npm ci）。
+on:
+  push:
+    branches: ['main']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check + e2e
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 浏览器不在默认位置时直接失败，而不是让 e2e 报一个看不懂的错。
+      - name: Locate Edge
+        shell: pwsh
+        run: |
+          $candidates = @(
+            'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
+            'C:\Program Files\Microsoft\Edge\Application\msedge.exe'
+          )
+          $edge = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $edge) { throw 'no msedge.exe on this runner' }
+          Add-Content -Path $env:GITHUB_ENV -Value "EDGE=$edge"
+          Write-Host "edge: $edge"
+
+      # 与本地 npm run check 完全一致：密钥、制品、清单、文档锚点、CSS、加载、单元测试。
+      - name: Installed checks
+        run: npm run check
+
+      # 真实 Edge 里的九节断言；--shot 把每张卡片状态存下来，失败时也能看。
+      # 浅深两套都跑：卡片底色跟宿主走，只在一边成立的配色必须被拦住。
+      - name: Browser e2e (light)
+        shell: pwsh
+        run: npm run e2e -- --browser "$env:EDGE" --scheme light --shot e2e-shots
+
+      - name: Browser e2e (dark)
+        shell: pwsh
+        run: npm run e2e -- --browser "$env:EDGE" --scheme dark
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-shots
+          path: e2e-shots
+          if-no-files-found: ignore
+          retention-days: 14

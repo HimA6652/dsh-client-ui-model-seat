@@ -1,18 +1,20 @@
 # dsh-client-ui-model-seat
 
+**English** · [中文](README.zh.md)
+
 The model + thinking control of the dsh composer, merged from two plugins that
 both replaced the same seat and therefore could not be installed together:
 
 - **dsh-client-ui-gpt-helper** — the shell: token-driven colours, the particle
-  thinking slider, fast mode with its long-press lock, the appearance panel,
-  the i18n dictionaries and the per-session wiring.
+  thinking slider, the appearance panel, the i18n dictionaries and the
+  per-session wiring.
 - **dsh-model-provider-prefix** — the skeleton of the card: a provider column
   beside a model column, hover decides which provider the model column shows,
   and a failed provider turns into a retry row.
 
 ![The card: providers on the left, the hovered provider's models on the right](https://raw.githubusercontent.com/HimA6652/dsh-client-ui-model-seat/main/assets/screenshot-1.png)
 ![Search reaches every provider and the card keeps its size](https://raw.githubusercontent.com/HimA6652/dsh-client-ui-model-seat/main/assets/screenshot-2.png)
-![The thinking pane: particle slider, fast toggle, long-press lock](https://raw.githubusercontent.com/HimA6652/dsh-client-ui-model-seat/main/assets/screenshot-3.png)
+![The thinking pane: the particle slider and the reset button](https://raw.githubusercontent.com/HimA6652/dsh-client-ui-model-seat/main/assets/screenshot-3.png)
 
 Use this one **instead of** either original — not beside them:
 
@@ -27,9 +29,9 @@ Who it is for / 适用场景:
 
 | You are… | This plugin gives you |
 | --- | --- |
-| Someone who needs the provider next to the model | One trigger showing `provider / model`, one card with both columns. |
+| Someone who needs the provider next to the model | One trigger showing `provider/model`, one card with both columns. |
 | Someone whose provider list is long | Hover the provider column; the model column swaps and the card stays put. |
-| Someone who tunes reasoning effort | The effort trigger and its particle slider, plus fast mode with a long-press lock. |
+| Someone who tunes reasoning effort | The effort trigger and its particle slider; the drift on the track is always running. |
 | Someone carrying both original plugins | One seat instead of two that cannot coexist. |
 
 Requires dsh `>= 0.2.1-rc.2` (`engines.dsh`). Client-side only: no network calls,
@@ -39,13 +41,13 @@ no credential access, no host module.
 
 | Surface | Behaviour |
 | --- | --- |
-| Model trigger | `provider / model` plus a caret. Opens the card on the provider+model columns; a second click closes it. |
-| Effort trigger | The current thinking level (`Max`, `Medium`, …). Opens the card on the particle slider; rendered only when the selected model declares thinking levels, and its label becomes `Fast on` while fast mode is locked. |
+| Model trigger | `provider/model` as one run of text, plus a caret. Opens the card on the provider+model columns; a second click closes it. |
+| Effort trigger | The current thinking level (`Max`, `Medium`, …). Opens the card on the particle slider; rendered only when the selected model declares thinking levels. |
 | Provider column | Every provider in the session directory with its model count, a check on the current provider, and a retry row for a provider whose list failed to load. |
 | Model column | Head shows the provider under the pointer; a 30 px search box sits inside the column. Hovering the provider column swaps the models **without moving the card**. |
 | Search | Typing searches **every** provider at once and shows the provider name on each row. The card keeps its two-column shape while typing — a re-shaping card is exactly the resize flicker this plugin removes. |
 | Thinking slider | The particle slider from the shell, over the level ladder of the selected model, with keyboard arrows/Home/End. |
-| Fast toggle | A 600 ms long-press on the bolt locks fast mode; the lock survives a reload (`…:fast:v1`) and re-arms when the window regains focus. |
+| Thinking head | The current level on the left — click it to return to the two columns — and a reset button that restores the model's default level. |
 | Appearance panel | `Ctrl+Shift+Alt+G`. Colour tokens per side (light/dark), scheme library, JSON import/export, reset, cross-apply to the other side, live preview. |
 
 Geometry: the card is `416 px` wide in the column layout and `300 px` in the
@@ -86,12 +88,11 @@ a status change — never on hover.
 ## Configuration
 
 Everything user-facing is edited in the appearance panel; there is no profile
-config key. Two `localStorage` records hold the state:
+config key. One `localStorage` record holds the state:
 
 | Key | Shape |
 | --- | --- |
 | `dsh-client-ui-model-seat:config:v1` | `{ version: 3, hotkey, paused, crossApply, slots: { light: { scheme }, dark: { scheme } }, schemes: { name: { name, colors } }, sides: { light, dark } }` |
-| `dsh-client-ui-model-seat:fast:v1` | `{ fast, locked }` |
 
 `paused: true` switches every custom colour off (the panel master switch);
 `slots[side].scheme` names the active scheme for a side, `sides[side]` holds the
@@ -99,8 +100,11 @@ per-token tune-ups (they win over the active scheme, so a manual edit is never
 swallowed), and `crossApply` makes one side colour both.
 Records written by the shell plugin (`dsh-client-ui-gpt-helper:config:v1`) are
 **not** read: the schema changed and a silent half-migration would be worse than
-the defaults. Both records are read on load, on a `storage` event, and when the
+the defaults. The record is read on load, on a `storage` event, and when the
 window regains focus.
+`dsh-client-ui-model-seat:fast:v1` is neither read nor written any more: the drift
+runs unconditionally and the key is left untouched, so rolling back to 0.1.2
+still finds its lock state.
 
 ## DOM contract
 
@@ -110,12 +114,12 @@ Stable hooks, for CSS and for tests:
 | --- | --- |
 | Root | `[data-model-seat="root"]`, plus `data-build` |
 | Triggers | `[data-model-seat="model-trigger"]`, `[data-model-seat="effort-trigger"]` |
-| Card | `[data-model-seat="menu"]` with `data-pane`, `data-layout`, `data-ready`, `data-flipped`, `data-fast`, `data-ultra`, `data-locked` |
+| Card | `[data-model-seat="menu"]` with `data-pane`, `data-layout`, `data-ready`, `data-flipped`, `data-ultra` |
 | Columns | `.ms-col[data-col="providers"]`, `.ms-col[data-col="models"]` |
 | Column head | `.ms-colHead`, separator `.ms-sep` |
 | Search | `.ms-search` (inside the models column) |
 | Rows | `.ms-row[data-kind="provider"\|model\|retry"]`, `data-active`, `data-current`, count `.ms-count`, note `.ms-rowNote` |
-| Slider / fast toggle | `[data-model-seat="thinking-slider"]`, `[data-model-seat="fast-toggle"]` |
+| Slider | `[data-model-seat="thinking-slider"]` |
 | Colour panel | `[data-model-seat="config-panel"]`, backdrop `[data-model-seat="config-backdrop"]` |
 | Fallback | `[data-model-seat="fallback"]` — what the error boundary renders |
 
@@ -175,30 +179,33 @@ store and the desktop app are never involved.
 
 ## Development
 
-    npm run check       # secrets + pack + validate + css audit + load check + tests
+    npm run check       # secrets + pack + validate + doc anchors + css audit + load check + tests
     npm run check:secret # dev paths, tokens, private keys in every text file
     npm run check:pack   # `files` vs the real npm artifact, in both directions
     npm run validate     # manifest, patch row, entry module, bundle load, apply
+    npm run docs         # MAINTENANCE.md line anchors still point at the right lines
     npm run css          # stylesheet scoping and dead-class audit
     npm run loadcheck    # against the installed dsh checkout (skips when absent)
     npm test             # node:test unit and integration tests
-    npm run e2e          # drives the real bundle in headless Edge over CDP
-    npm run check:all    # check + e2e
+    npm run e2e          # drives the real bundle in headless Edge over CDP (light)
+    npm run e2e:dark     # same run under prefers-color-scheme: dark
+    npm run check:all    # check + e2e + e2e:dark
     npm run live -- --url URL   # the same checks inside a real dsh
     npm run release 0.2.0       # gates → npm → commit → tag → push (see CHANGELOG rule)
 
-`npm run e2e` serves `test/harness/` on a loopback port, opens it in headless
+`npm run e2e` (`--scheme light|dark`) serves `test/harness/` on a loopback port, opens it in headless
 Edge over CDP and asserts, in nine sections: the two-column card, a constant
 height while the pointer rests over 60 models, close/reopen determinism, the
 cross-provider query, the empty-query note (one padded `.ms-empty`, zero rows),
-the slider keyboard path, the fast toggle (click, long-press lock, unlock), the
-head status button returning to the columns, the colour-panel hotkey, and a
-clean console. `--shot DIR` writes screenshots;
+the thinking pane (no bolt control, drift always on, its own height, icon and
+label contrast), the slider keyboard path, the reset button, the retirement of
+the fast-mode key, the head status button returning to the columns, the
+colour-panel hotkey, and a clean console. `--shot DIR` writes screenshots;
 `--dump` prints the card box and its children. The e2e loads React from the
 committed `test/vendor/` UMD builds, so a fresh clone needs no external
 directory and no network; `--vendor DIR` / `REACT_VENDOR=DIR` override it.
 
-`lib/client.js` is **hand-written** — a 3642-line single-file bundle with no
+`lib/client.js` is **hand-written** — a 3217-line single-file bundle with no
 build step, because `dsh.client` takes one `./client` entry. `tools/merge/gen-client.mjs`
 produced the first draft from the shell bundle and is kept only as a record. It
 now refuses to run without `--force`, and even then backs the current file up to

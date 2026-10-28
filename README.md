@@ -143,7 +143,7 @@ inside a real dsh web app without touching your own store, give it a throwaway
     mkdir -p "$SEAT_HOME" && cp ~/.dsh/.credentials.yaml "$SEAT_HOME/"
     export DSH_HOME=$SEAT_HOME
     DSH=<checkout>/node_modules/@deepseek-ai/dsh/lib/bin.js
-    node "$DSH" plugin --profile seatcheck --from-default-profile web
+    node "$DSH" --profile seatcheck --from-default-profile web --help   # creates seatcheck from the web template
     node "$DSH" plugin --profile seatcheck add link:$PWD
     node "$DSH" --profile seatcheck --port 6124 --host 127.0.0.1 --no-open
 

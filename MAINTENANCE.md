@@ -404,7 +404,8 @@ SEAT_HOME=~/AppData/Local/Temp/seat-live-home
 mkdir -p "$SEAT_HOME" && cp ~/.dsh/.credentials.yaml "$SEAT_HOME/"
 export DSH_HOME=$SEAT_HOME
 DSH=/path/to/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js
-node "$DSH" plugin --profile seatcheck --from-default-profile web
+# --from-default-profile 是启动参数，不是 plugin 参数：带它启动一次即可用 web 模板建出 seatcheck
+node "$DSH" --profile seatcheck --from-default-profile web --help
 node "$DSH" plugin --profile seatcheck add link:/path/to/dsh-client-ui-model-seat
 node "$DSH" --profile seatcheck --port 6124 --host 127.0.0.1 --no-open
 # 从 banner 里取 http://127.0.0.1:6124/?token=…

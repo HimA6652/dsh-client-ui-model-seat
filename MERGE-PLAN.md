@@ -17,7 +17,7 @@
 
 验收数据（0.1.0，`npm run check` + `npm run e2e` + 真实 dsh）：validate 57 项、css-audit 190 规则/202 选择器、loadcheck 10 项、29 个用例全绿；fixture 卡片 416×420、指针静置 900 ms 高度不变、查询后仍为 `columns`；真实桌面 profile（15 个插件同装）6 个供应商、卡片 416×238、900 ms 内单一高度、控制台无错误。
 
-验收数据（0.1.1）：validate 61 项、css-audit 193 规则/205 选择器（12 个 `.ms-` 类全部有规则且有渲染）、loadcheck 10 项、29 个用例全绿；`npm run e2e` 9 段全过、`problems: []`，卡片 416×420 高度恒定，新增的第 5 段断言空查询只剩一条带 8px 内边距的 `.ms-empty`（截图 `.shots/v011/03-empty-query.png`）。
+验收数据（0.1.1）：validate 79 项、css-audit 193 规则/205 选择器（12 个 `.ms-` 类全部有规则且有渲染）、loadcheck 6 项（无 `DSH_ROOT` 时整体跳过）、29 个用例全绿、`check-secrets` 29 个文件 0 命中、`check-pack` 12 个文件 202.0 kB 且四向对账通过；`npm run e2e` 9 段全过、`problems: []`，卡片 416×420 高度恒定，新增的第 5 段断言空查询只剩一条带 8px 内边距的 `.ms-empty`（截图 `.shots/v011/03-empty-query.png`）。
 
 ---
 

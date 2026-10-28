@@ -20,12 +20,23 @@
 | `lib/index.js` | Host 半边；只导出 `name` 与空的 `apply()` | 基本不动（`validate` 禁止 Host 半边碰 DOM） |
 | `cordis.patch.yml` | 往 profile 插一行 `{ id: model-seat, name: dsh-client-ui-model-seat }` | 换插件 id 时才动 |
 | `package.json` | `dsh.client` / `dsh.bundle.patch` / `files` / scripts | 加脚本、改注入目标时动 |
-| `README.md` | 对外说明（英文） | 行为变更时同步 |
+| `README.md` | 对外说明（英文） | 行为变更时同步；已知限制、安装通道、测试命令都在里面 |
+| `CHANGELOG.md` | 面向用户的版本说明；GitHub Release 的正文来源 | 每次发版前**先**写，`release.mjs` 会硬拦没有的一节 |
 | `MAINTENANCE.md` | 本文（中文） | 结构变更时同步 |
+| `MARKET.md` | 投递 dsh 插件市场的完整步骤与条目内容 | 市场规则变化时同步 |
+| `assets/` | 图标与三张截图（截图由 `npm run shots` 生成，不手抠） | 换皮时重跑 `shots` |
+| `screenshots.json` | 声明仓库里的截图给市场 nightly 抓取（1-8 条相对路径） | 增删截图时同步 |
+| `publish/market-entry.yml` | 待提交给 `awesome-dsh-plugin` 的条目 | 与 `package.json` 描述保持一致 |
+| `.github/workflows/release.yml` | `v*` 标签触发，跑自检与测试后建 GitHub Release | 随发版流程变化 |
 | `MERGE-PLAN.md` | 合并前的设计文档，**历史档案**；文首"实施结果"一节记录了与设计的偏差 | 不改，只在重大偏差时补一行 |
-| `scripts/validate-plugin.mjs` | 清单/补丁/入口/bundle 加载/apply 的静态+运行时校验（61 项） | 新增入口契约时加检查 |
+| `scripts/validate-plugin.mjs` | 清单/补丁/入口/bundle 加载/apply 的静态+运行时校验（79 项） | 新增入口契约时加检查 |
 | `scripts/css-audit.mjs` | 样式表作用域、死类、border-box、上游属性残留的审计 | 新增 `.ms-` 类时会被自动覆盖 |
 | `scripts/loadcheck.mjs` | 针对本机 dsh checkout 做加载与优先级排序检查（无 checkout 时跳过） | 少动 |
+| `scripts/check-secrets.mjs` | 凭据形状与本机路径扫描（29 个文本文件） | 新增本机相关文档时会被自动覆盖 |
+| `scripts/check-pack.mjs` | `files` 与真实 npm 制品的四向对账 | 增删发布文件时 |
+| `scripts/release.mjs` | 一条命令发版：四道门 → 检查 → npm → 提交 → 标签 → 推送 | 发版规则变化时 |
+| `scripts/release-notes.mjs` | 从 CHANGELOG 抽 Release 正文 | 少动 |
+| `scripts/shots.mjs` | 生成 `assets/screenshot-*.png`（真实 bundle + demo 数据，2 倍图） | 换皮或加截图时 |
 | `scripts/browser-check.mjs` | 真浏览器 E2E（CDP + headless Edge），9 个段落 | 交互变更时同步 |
 | `scripts/live-check.mjs` | 在**真实 dsh** 页面上跑的断言 | 同上 |
 | `test/*.test.mjs` | 29 个 node:test 用例（frame/i18n/register/rows） | 同上 |
@@ -359,16 +370,20 @@ modelLabel = 名称 ?? "provider/model" ?? loading/fallback 文案
 ### 11.1 一键
 
 ```
-npm run check       # validate → css → loadcheck → test     （约 3 s，不需要浏览器）
-npm run e2e         # headless Edge + CDP                    （约 20 s，用仓库内 test/vendor 的 react）
+npm run check       # secret → pack → validate → css → loadcheck → test   （约 4 s，不需要浏览器）
+npm run e2e         # headless Edge + CDP                                 （约 20 s，用仓库内 test/vendor 的 react）
 npm run check:all   # 两者
 ```
+
+发版前的最后一道是 `prepublishOnly`（`check:pack` + `check:secret` + `npm test`）：`npm publish` 自己会把它跑一遍，绕过脚本手敲 `npm publish` 也躲不过去。
 
 ### 11.2 每个脚本守什么
 
 | 脚本 | 数量 | 守的东西 | 失败时先看 |
 | --- | --- | --- | --- |
-| `validate-plugin.mjs` | 61 项 | 清单字段、`files`、`exports`、补丁行 id/name、入口 `name`/`apply`、Host 半边不碰 DOM、只有一次 `__ModuleLoader__.load`、`apply` 是真函数、`__internals` 齐全、`BUILD` 存在且含版本、无上游模块 id/上游存储键、无 `data-dsh-pm-`、无 `data-gpt-helper`、8 个 `data-model-seat` 值齐全、座位键存在、只注册一次、槽位名、优先级 `-2`、locale 命名空间、按会话 inject、边界组件、词典注册、中英双语、只有一个 `<style>`、样式 id、样式体量、`frame` 契约、卡片规则、槽位动画保留、样式复用、head 里只有一张表 | 打印的第一条 `✖` |
+| `check-secrets.mjs` | 29 个文件 | 凭据形状（GitHub/OpenAI/AWS token、私钥、npm authToken）与本机路径（Windows 用户目录、POSIX home、局域网 IP）；占位符白名单避免误报；行尾 `secret-ok` 可豁免 | 打印的文件:行号 |
+| `check-pack.mjs` | 4 条断言 | `files` 无目录项、制品无备份/日志、`files` 全在、制品无清单外文件 | 打印的第一条 `✖` |
+| `validate-plugin.mjs` | 79 项 | 清单字段、`files`、`exports`、补丁行 id/name、入口 `name`/`apply`、Host 半边不碰 DOM、只有一次 `__ModuleLoader__.load`、`apply` 是真函数、`__internals` 齐全、`BUILD` 存在且含版本、无上游模块 id/上游存储键、无 `data-dsh-pm-`、无 `data-gpt-helper`、8 个 `data-model-seat` 值齐全、座位键存在、只注册一次、槽位名、优先级 `-2`、locale 命名空间、按会话 inject、边界组件、词典注册、中英双语、只有一个 `<style>`、样式 id、样式体量、`frame` 契约、卡片规则、槽位动画保留、样式复用、head 里只有一张表、可发布（没有 `private`）、license/author/repository 齐全、商店资产（图标存在、`screenshots.json` 可解析且 1-8 条相对路径都存在） | 打印的第一条 `✖` |
 | `css-audit.mjs` | 193 规则 / 205 选择器 | `<style>` 注入、括号平衡、无 `!important`、无未解析颜色标记、无模板占位符、无上游属性选择器、选择器数 > 60、无裸 `.ms-`、每条规则挂在控件根下、每个渲染出的 `.ms-` 类都有规则、卡片是 border-box；死规则只 warn | `css-audit:` 汇总行 + 上一条 `✖` |
 | `loadcheck.mjs` | 10 项 | 注入目标存在、槽位在加载的前端里声明、注册表按优先级排序、入口名与包名一致、`apply` 导出、补丁行 id 是新的、补丁只插一行；**没有 dsh checkout 时整体跳过**（不算失败） | `skipped` 说明 |
 | `test/frame.test.mjs` | 10 | `frame()` 纯函数语义：列宽、面板更窄、自然高度优先、上下翻转、锚点底边、无空间时不翻、视口夹取、封顶后与自然高度无关、`geometryKey` 只随三要素变、地板语义 | 对应用例名 |
@@ -523,15 +538,21 @@ npm run live -- --url "http://127.0.0.1:6124/?token=…"
 5. **只含 `var()` 的声明会被丢弃**，所以颜色必须是构建期字面量。
 6. **单座位**：本插件不提供"关掉自己"的开关；要停就用 `dsh plugin remove`。
 7. **无运行时依赖、无构建步骤**：改完 `lib/client.js` 直接用，但宿主只在 boot 时挂载 bundle，**改完必须重开应用**（Ctrl+R 只重载页面，不重新加载 bundle —— 除非宿主热更新）。
-8. **`.research/` 与 `.shots/` 会被提交**：没有 `.gitignore`，注意别把 700 MB 克隆或截图带进仓库。
+8. **`.research/` 与 `.shots/` 不进仓库**：`.gitignore` 里有这两条，还有 `node_modules/`、`.tmp-*.log`、`*.tgz`。新增临时目录时记得同时加规则，并用 `git check-ignore -v <path>` 验证真的被挡住（见 §19.1）。
 
 ## 17. 安装、升级、回滚
 
 ### 17.1 装（web / 普通 profile）
 
 ```bash
+# 从公开仓库（用户走这条；已实测可装）
+node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add github:HimA6652/dsh-client-ui-model-seat
+
+# 从本地工作区（开发时用这条，改完要重启应用才生效）
 node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add link:/path/to/dsh-client-ui-model-seat
 ```
+
+npm 通道尚未开通（`npm view dsh-client-ui-model-seat` 是 404），所以 `add dsh-client-ui-model-seat` 目前会失败——首次 `npm publish` 之后才成立。
 
 ### 17.2 装（desktop profile）
 
@@ -580,3 +601,121 @@ node seat-desktop-cli.mjs plugin --profile desktop remove dsh-client-ui-model-se
 
 9. **列间键盘导航** —— 用户在 0.1.1 明确说这一轮不做：左/右方向键在供应商列与模型列之间移焦点。现状是 Tab 在卡片内自然穿行、滑块的方向键已实现（`onSliderKey`，`lib/client.js:3154`）。将来要做，注意别让焦点移动触发 `setRect`/`setFrozen` 复量。
 10. **host 半边的 `engines.dsh`** —— 随容器 API 稳定后再复核 `>=0.2.1-rc.2` 是否仍准确。
+
+## 19. 发布流程与提交规范
+
+本节是 `E:/DeepseekHarnessWorkspace/0000docs/` 那两份规范的落地版本：规则原文在那边，这里只写本仓库怎么执行、拿什么证明执行了。
+
+### 19.1 不可提交清单（由 .gitignore 挡住，由 check-secrets 兜底）
+
+| 类别 | 具体东西 | 为什么不行 | 怎么挡 |
+| --- | --- | --- | --- |
+| 凭据 | `.credentials.yaml`、任何 token / 私钥 / `sk-…` | 零容忍，进过一次就要清 git 历史 | `check-secrets` 命中即 `exit 1` |
+| 本机路径 | `C:/Users/<用户名>/…`、`X:/ProgramData/<文件夹>`、`/home/<用户名>` | 把开发机身份写进公开文档 | `check-secrets` 的 `windows dev path` / `posix home path` 规则；占位符白名单（`you`、`<your-name>`、`/path/to/`）不误报 |
+| 内网地址 | `192.168.x.x`、`10.x.x.x`、`172.16-31.x.x` | 暴露内网拓扑；`127.0.0.1` 是回环、文档里必须写，不算泄漏 | `check-secrets` 的 `lan ip` 规则 |
+| 私有服务名 | 真实 key 池名、内部代理名、账号余额 | 元信息层泄漏 | 人工评审；harness 演示数据只用公开供应商名 |
+| 中间产物 | `.research/`（上游克隆）、`.shots/`（截图）、`*.tgz`、`node_modules/`、`.tmp-*.log` | 体积与内容都不可控 | `.gitignore` |
+| 备份文件 | `*.bak`、`lib/client.js.bak-gen-*` | 会连带把旧代码发到 npm | `.gitignore` + `check-pack` 的 `FORBIDDEN` 规则 |
+
+验证方式是让 git 回答，而不是看文件：
+
+```bash
+git check-ignore -v .research .shots node_modules lib/client.js.bak-gen-20261027
+# 每行都必须有输出（命中规则）；任何一行空着就说明没挡住
+```
+
+本机环境事实：没有 `gh` CLI；`git push` 走 SSH（`~/.ssh/config` 已把 `github.com` 映射到 `ssh.github.com:443`，22 端口不可用）；`api.github.com` 需要 `curl --ssl-no-revoke`。
+
+### 19.2 制品清单：files 只能列文件
+
+`package.json` 的 `files` **不允许出现目录**。曾经写过 `"assets"`：目录语义是“把里面所有东西都带上”，一个 `*.bak` 或临时截图会跟着发布出去。现在逐文件列出，并由 `npm run check:pack` 拿 `npm pack --dry-run --json` 的真实输出反向核对四条：
+
+1. `files` 里每一项 `statSync(...).isDirectory() === false`；
+2. 制品里不含 `*.bak/orig/rej/swp/tmp/log/tsbuildinfo`、`~`、`.DS_Store`、`node_modules/`；
+3. `files` 写了的每一项都真的在制品里；
+4. 制品里没有清单外的文件 —— 只有 `package.json` / `README.md` / `LICENSE` / `CHANGELOG.md` 天然豁免。
+
+### 19.3 双向验证配方（改完门禁必跑一次）
+
+只证明“现在是绿的”不够，要证明它**会红**。在隔离副本里做，别动本体：
+
+```bash
+cp -r . /tmp/seat-gate && cd /tmp/seat-gate
+# ① 把 files 写回目录 → 必须红
+node -e "const f='package.json',p=JSON.parse(require('fs').readFileSync(f,'utf8'));p.files=p.files.map(x=>x.startsWith('assets/')?'assets':x);require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
+node scripts/check-pack.mjs; echo "expect 1, got $?"
+# ② 删掉一个 files 里声明过的文件 → 必须红（第 1、3 条断言）
+mv assets/screenshot-3.png /tmp/ && node scripts/check-pack.mjs; echo "expect 1, got $?"
+mv /tmp/screenshot-3.png assets/
+# ③ 把备份文件写进 files → 必须红（第 2 条断言：它真的会进制品）
+echo x > assets/icon-180.png.bak
+node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.files.push('assets/icon-180.png.bak');fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
+node scripts/check-pack.mjs; echo "expect 1, got $?"
+# ④ 还原 → 必须绿
+git checkout -- package.json && rm assets/icon-180.png.bak
+node scripts/check-pack.mjs; echo "expect 0, got $?"
+```
+
+`check-secrets` 同理：往任意 `.md` 写一行 `X:/ProgramData/<文件夹>`（把 X 换成一个盘符字母）必须 `exit 1`，改成 `/path/to/x` 必须 `exit 0`。
+
+### 19.4 一条命令发版
+
+```bash
+# 1) 先手写 CHANGELOG.md 里的 "## [0.2.0] - YYYY-MM-DD" 小节（脚本不替你编）
+# 2) 再跑
+npm run release 0.2.0               # 检查 → npm → 提交 → 打标签 → 推送
+npm run release 0.2.0 --dry-run     # 只跑到测试为止
+npm run release 0.2.0 --no-publish  # 不发 npm，只发 GitHub
+npm run release 0.2.0 --no-push     # 提交 + 标签，不推
+```
+
+`scripts/release.mjs` 的四道硬门（按失败顺序）：
+
+1. `CHANGELOG.md` 里存在 `## [<version>]` —— 否则发出去的 Release 是空的；
+2. `git status --porcelain` 为空 —— 否则分不清哪些改动进了这一版；
+3. 当前分支是 `main`；
+4. 标签 `v<version>` 本地没有、**远端也没有**（`git ls-remote --tags origin v<version>`；换过机器时本地干净而远端有）。
+
+过了门才动版本号：`package.json` 的 `version` 与 `lib/client.js:16` 的 `BUILD = '<version>+merge'` 一起改（`browser-check` 断言 `data-build === 版本号 + '+merge'`，两边不一致 e2e 立刻红）。随后依次跑 `check-secrets` → `check-pack` → `release-notes` → `validate` → `npm test`，再用 `npm whoami` 与 `npm view <pkg>@<version>` 确认版本号没被占，才 `npm publish`。
+
+提交阶段只 `git add package.json lib/client.js`；暂存区为空就跳过 commit（空 commit 会让脚本当场退出，把标签和推送一起带走）。之后 `git tag -a v<version>` → `git push` → `git push origin v<version>`，Actions 建 Release。
+
+### 19.5 中途挂掉的恢复
+
+| 挂在哪 | 现状 | 怎么收 |
+| --- | --- | --- |
+| 检查跑完、npm 没发 | 工作区里两个版本号文件已改 | `git checkout -- package.json lib/client.js`，或直接接着跑（幂等） |
+| npm 已发、没提交 | 注册表有版本，仓库没对应提交 | 用 `npm run release <同版本> --no-publish` 走完提交与标签 |
+| 提交了、没打标签 | 提交已在 main 上 | `git tag -a v<version> -m v<version> && git push && git push origin v<version>` |
+| 打了标签、没推 | 本地有标签 | 只 `git push origin v<version>` |
+| 推了标签、Actions 失败 | 没有 Release 页 | 修好 workflow 重跑，或本地 `gh release create --verify-tag` |
+| 发出去的版本有 bug | 已有人装 | 不发 `npm unpublish`，改 CHANGELOG 发补丁版本 |
+
+### 19.6 渠道对齐（本仓库实际开了几个）
+
+| 渠道 | 现状 | 对齐要求 |
+| --- | --- | --- |
+| git 标签 | `v0.1.1` 已推（annotated，peeled `fb00828`） | 与 `package.json` 的 `version` 一致 |
+| GitHub Release | 由 `.github/workflows/release.yml` 在 `v*` 标签上自动创建，正文取 `CHANGELOG.md` 同版本小节 | 发之前把正文里的旧措辞重扫一遍 |
+| npm | **未发布**（`npm view dsh-client-ui-model-seat` → 404）；README 的安装段已按“当前只有 GitHub 通道”写 | 首次 `npm publish` 之后，`dsh plugin add dsh-client-ui-model-seat` 才成立 |
+| dsh 插件市场 | 尚未提 PR（见 `MARKET.md`） | 提 PR 前先克隆 `awesome-dsh-plugin` 跑它自己的校验脚本 |
+
+### 19.7 已记录的决策
+
+- **不改写 git 历史**。首次推送用了 `git add -A` 与散文式提交说明，当时没有任何 npm 制品，改写历史的收益低于风险。从现在起按规范提交，历史留档；这条决定本身写在这里，免得下一个人以为是忘了。
+- **`v0.1.1` 标签早于 `CHANGELOG.md`**。当时的 Release 正文是手写的。**不要**移动或重打 `v0.1.1`：下一个版本号走 `release.mjs`，三条渠道重新对齐。
+- **下一个版本号用 `0.1.2` 或更高**，让“有 CHANGELOG 的 Release”和“没有的”区分得开。
+- **“先不发”是四层意思**：① 不写版本说明 ② 不提交 ③ 不推送 ④ 不打标签/不发 npm。听到这四个字先问是哪一层，默认按 ①+② 处理（改完留在工作区）。
+
+### 19.8 提交信息规范
+
+```
+type(scope): 一句话，50-70 字符，句尾不加句号
+
+问题是什么 → 怎么改的 → 影响面
+```
+
+- `type`：`feat` / `fix` / `docs` / `chore` / `test` / `refactor`；`scope` 用目录或子系统（`client`、`scripts`、`harness`）。
+- 一行只讲一件事；写问题和改法，不写“我为什么这样想”。
+- 提交信息是公开页面：不出现分支名、人名、会话号。
+- 例：`fix(client): freeze card height so hover cannot resize it`。

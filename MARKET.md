@@ -3,6 +3,8 @@
 > 目标：让 `dsh-client-ui-model-seat` 出现在 dsh 的「插件市场 → 发现」里，并能一键安装。
 > 本文所有结论都标注了来源；推断项标注「待确认」。今天是 2026-10-28（Asia/Shanghai）。
 
+**当前状态（2026-10-28 更新）**：仓库已公开并推了 `v0.1.1` 标签（`github:HimA6652/dsh-client-ui-model-seat` 实测可装）；**npm 尚未发布**，所以 `dsh plugin add dsh-client-ui-model-seat` 现在会 404，条目里也还没写 npm 相关字段（市场 CI 会自己探测 npm 与 star 数，不需要手填）。提交 PR 之前必须做的两件事：① 先把仓库里的 `scripts/` 自检跑绿（`npm run check`），② 克隆 `awesome-dsh-plugin` 并在本地跑它自己的校验脚本（规范要求：提第三方清单前先跑对方校验器）。
+
 ## 0. 结论先行
 
 市场本身**不收提交**。它只是一份精选清单的展示层：

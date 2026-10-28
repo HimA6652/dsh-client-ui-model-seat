@@ -10,18 +10,30 @@ both replaced the same seat and therefore could not be installed together:
   beside a model column, hover decides which provider the model column shows,
   and a failed provider turns into a retry row.
 
-![The card: providers on the left, the hovered provider's models on the right](assets/screenshot-1.png)
-![Search reaches every provider and the card keeps its size](assets/screenshot-2.png)
-![The thinking pane: particle slider, fast toggle, long-press lock](assets/screenshot-3.png)
+![The card: providers on the left, the hovered provider's models on the right](https://raw.githubusercontent.com/HimA6652/dsh-client-ui-model-seat/main/assets/screenshot-1.png)
+![Search reaches every provider and the card keeps its size](https://raw.githubusercontent.com/HimA6652/dsh-client-ui-model-seat/main/assets/screenshot-2.png)
+![The thinking pane: particle slider, fast toggle, long-press lock](https://raw.githubusercontent.com/HimA6652/dsh-client-ui-model-seat/main/assets/screenshot-3.png)
 
-Neither original needs to stay installed. Remove them before enabling this one:
+Use this one **instead of** either original — not beside them:
 
     dsh plugin remove dsh-client-ui-gpt-helper
     dsh plugin remove dsh-model-provider-prefix
 
-Maintaining this file: see [MAINTENANCE.md](MAINTENANCE.md) (Chinese) for the
+Maintaining this file: see [MAINTENANCE.md](https://github.com/HimA6652/dsh-client-ui-model-seat/blob/main/MAINTENANCE.md) (Chinese) for the
 code map, the invariants that keep the card stable, the test matrix and the
-real-app verification recipes.
+real-app verification recipes. Changes per release: [CHANGELOG.md](https://github.com/HimA6652/dsh-client-ui-model-seat/blob/main/CHANGELOG.md).
+
+Who it is for / 适用场景:
+
+| You are… | This plugin gives you |
+| --- | --- |
+| Someone who needs the provider next to the model | One trigger showing `provider / model`, one card with both columns. |
+| Someone whose provider list is long | Hover the provider column; the model column swaps and the card stays put. |
+| Someone who tunes reasoning effort | The effort trigger and its particle slider, plus fast mode with a long-press lock. |
+| Someone carrying both original plugins | One seat instead of two that cannot coexist. |
+
+Requires dsh `>= 0.2.1-rc.2` (`engines.dsh`). Client-side only: no network calls,
+no credential access, no host module.
 
 ## What it does
 
@@ -115,12 +127,13 @@ comes back.
 
 ## Install
 
-    dsh plugin add dsh-client-ui-model-seat                              # npm
-    dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # from source
+    dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # from source (works today)
     dsh plugin add link:/absolute/path/to/dsh-client-ui-model-seat       # local checkout
 
-It is listed in the dsh plugin market (`awesome-dsh-plugin`), so the market's
-install button is the ordinary path.
+The npm channel is not open yet: this package has no registry release, so
+`dsh plugin add dsh-client-ui-model-seat` will fail with `404` until it does. Use
+the GitHub install above. Once published, the same command resolves from the
+registry without any change on your side.
 
 The plugin bundle inserts one row into the profile (`id: model-seat`) and
 registers its seat at `priority: -2`, so a leftover copy of either original
@@ -161,14 +174,17 @@ store and the desktop app are never involved.
 
 ## Development
 
-    npm run check     # validate + css audit + load check + tests
-    npm run validate  # manifest, patch row, entry module, bundle load, apply
-    npm run css       # stylesheet scoping and dead-class audit
-    npm run loadcheck # against the installed dsh checkout
-    npm test          # node:test unit and integration tests (29)
-    npm run e2e       # drives the real bundle in headless Edge over CDP
-    npm run check:all # check + e2e
+    npm run check       # secrets + pack + validate + css audit + load check + tests
+    npm run check:secret # dev paths, tokens, private keys in every text file
+    npm run check:pack   # `files` vs the real npm artifact, in both directions
+    npm run validate     # manifest, patch row, entry module, bundle load, apply
+    npm run css          # stylesheet scoping and dead-class audit
+    npm run loadcheck    # against the installed dsh checkout (skips when absent)
+    npm test             # node:test unit and integration tests
+    npm run e2e          # drives the real bundle in headless Edge over CDP
+    npm run check:all    # check + e2e
     npm run live -- --url URL   # the same checks inside a real dsh
+    npm run release 0.2.0       # gates → npm → commit → tag → push (see CHANGELOG rule)
 
 `npm run e2e` serves `test/harness/` on a loopback port, opens it in headless
 Edge over CDP and asserts, in nine sections: the two-column card, a constant
@@ -186,6 +202,28 @@ build step, because `dsh.client` takes one `./client` entry. `tools/merge/gen-cl
 produced the first draft from the shell bundle and is kept only as a record. It
 now refuses to run without `--force`, and even then backs the current file up to
 `lib/client.js.bak-gen-<timestamp>` first.
+
+## Known limitations
+
+- **One seat, one owner.** The plugin registers at `priority: -2` for
+  `conversation.input.model`. Another plugin registering the same priority for the
+  same slot is resolved by mount order, not by this plugin.
+- **No column-to-column keyboard navigation.** Arrows move inside the focused
+  column (the slider, the search box, the rows); Tab leaves the card. Hover and
+  clicks are the way to change provider.
+- **The card does not animate.** Switching panes or providers relayouts in one
+  frame by design — an animated height is the resize loop this merge removes.
+  A window resize re-measures the clamp, so an open card follows the viewport.
+- **Colours live in `localStorage`** (`dsh-client-ui-model-seat:config:v1`) per
+  browser profile. They do not follow the account across machines; the panel's
+  JSON import/export is the only way to move them.
+- **Search covers model name and id, not provider names.** Typing `ollama` finds
+  `ollama/qwen` through the model, not through the provider column.
+- **Web client surface only** (`dsh.client.platform: "web"`, which the desktop app
+  renders). The terminal surface is untouched.
+- **`lib/client.js` is one hand-written file** with no build step; `dsh.client`
+  takes a single `./client` entry. There is no per-model override layer: the
+  plugin edits the seat, not the model list.
 
 ## License
 

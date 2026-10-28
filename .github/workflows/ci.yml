@@ -47,19 +47,37 @@ jobs:
 
       # 真实 Edge 里的九节断言；--shot 把每张卡片状态存下来，失败时也能看。
       # 浅深两套都跑：卡片底色跟宿主走，只在一边成立的配色必须被拦住。
+      # 失败时把报告里最要紧的几行提升成 annotation：公开仓库里任何人（包括没登录的
+      # 维护者）都能从 check-run 的 annotations API 读到失败原因，不必去翻日志。
       - name: Browser e2e (light)
         shell: pwsh
-        run: npm run e2e -- --browser "$env:EDGE" --scheme light --shot e2e-shots
+        run: |
+          npm run e2e -- --browser "$env:EDGE" --scheme light --shot e2e-shots 2>&1 | Tee-Object -FilePath e2e-light.log
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content e2e-light.log | Where-Object { $_ -match '"the |threw|browser-check:|no react vendor|never opened port|"problems"' } | Select-Object -Last 12
+            if (-not $lines) { $lines = Get-Content e2e-light.log | Select-Object -Last 12 }
+            foreach ($line in $lines) { Write-Host ('::error::' + $line.Trim()) }
+            exit 1
+          }
 
       - name: Browser e2e (dark)
         shell: pwsh
-        run: npm run e2e -- --browser "$env:EDGE" --scheme dark
+        run: |
+          npm run e2e -- --browser "$env:EDGE" --scheme dark 2>&1 | Tee-Object -FilePath e2e-dark.log
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content e2e-dark.log | Where-Object { $_ -match '"the |threw|browser-check:|no react vendor|never opened port|"problems"' } | Select-Object -Last 12
+            if (-not $lines) { $lines = Get-Content e2e-dark.log | Select-Object -Last 12 }
+            foreach ($line in $lines) { Write-Host ('::error::' + $line.Trim()) }
+            exit 1
+          }
 
       - name: Keep the screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-shots
-          path: e2e-shots
+          path: |
+            e2e-shots
+            e2e-*.log
           if-no-files-found: ignore
           retention-days: 14

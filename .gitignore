@@ -1,5 +1,9 @@
+# 中间产物与备份：不进仓库（清单与理由见 MAINTENANCE.md §19.1）
 node_modules/
 .shots/
 .research/
 .tmp-*.log
 *.tgz
+*.bak
+*.bak-gen-*
+.DS_Store

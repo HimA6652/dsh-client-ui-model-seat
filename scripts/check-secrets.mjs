@@ -18,7 +18,7 @@ const ALLOW_MARK = 'secret-ok'
 const MAX_BYTES = 2 * 1024 * 1024
 
 // test/vendor 是 React 的 UMD 压缩包（单行几百 KB），.research / .shots 是不进仓库的临时材料。
-const SKIP_DIRS = new Set(['node_modules', '.git', '.shots', '.research', 'vendor', 'coverage'])
+const SKIP_DIRS = new Set(['node_modules', '.git', '.shots', '.research', 'memory', 'vendor', 'coverage'])
 const TEXT_EXT = /(?:^|\/)[^/]+\.(?:md|txt|mjs|js|mts|ts|json|ya?ml|yml|html|css|sh|ps1|cjs|svg)$/i
 
 // 占位符白名单：文档里本来就该写这些名字，不当作真实用户名

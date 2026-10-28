@@ -2,6 +2,7 @@
 node_modules/
 .shots/
 .research/
+memory/
 .tmp-*.log
 *.tgz
 *.bak

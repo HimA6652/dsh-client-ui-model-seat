@@ -4,10 +4,26 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-28
+
+界面与 0.1.1 一致，这一版把发布通道和文档补齐，npm 通道从这一版开通。
+
 ### Added
 
-- `npm run check:pack` / `npm run check:secret`：发布前核对 npm 制品清单与本机路径、凭据形状。
-- `scripts/release.mjs` 与 tag 触发的 Release workflow，Release 正文取自本文件对应小节。
+- `npm run check:secret` / `npm run check:pack`：发布前扫凭据形状与本机路径，并拿 `npm pack` 的真实产物跟 `files` 四向对账（目录项、`.bak` / `.log`、声明了却没打进去的文件都会被拦下）。
+- `scripts/release.mjs`：查版本说明 → 工作区干净 → 在 main → 本地与远端标签都不存在，四道闸过后才发；tag 推送后由 Release workflow 建 GitHub Release，正文取自本文件。
+- `CHANGELOG.md`（本文件）。
+
+### Changed
+
+- 制品清单从目录改成逐文件枚举：0.1.1 的 `files` 写的是 `assets`，任何临时截图、`.bak` 都会跟着包走；现在只发 `files` 里的 11 条确定路径（加上 `package.json` 一共 12 个文件）。
+- 文档里的本机绝对路径全部换成 `/path/to/...` 占位；README 的维护文档、更新日志链接改为绝对地址（在 npm 页面上原本是死链）。
+- README 增加「适用场景」与「已知限制」两节，并写明当前只有 GitHub 安装通道。
+
+### Upgrade
+
+- 装了 0.1.1 的不用重装，界面与存储键都没变（颜色仍在 `dsh-client-ui-model-seat:config:v1`）。
+- 这一版起可以直接用 npm 通道：`dsh plugin --profile <profile> add dsh-client-ui-model-seat`；GitHub 通道照旧。
 
 ## [0.1.1] - 2026-10-28
 

@@ -10,7 +10,7 @@
  * frame untouched.
  *
  * It then exercises the rest of the merged behaviour a unit test cannot reach:
- * the thinking pane (slider, keyboard, fast toggle, long-press lock), the
+ * the thinking pane (slider, keyboard, reset button, the always-on drift), the
  * cross-provider search with its empty state, the head status button that
  * returns to the columns, and the config panel hotkey.
  *
@@ -39,6 +39,10 @@ const flag = (name, fallback) => {
 }
 const PORT = Number(flag('port', '9333'))
 const DWELL = Number(flag('dwell', '900'))
+// The fixture has to be checked on the theme the user actually runs: the light
+// card is a white surface and the dark one is near-black, so a colour that only
+// works on one of them is invisible on the other.
+const SCHEME = flag('scheme', 'light') === 'dark' ? 'dark' : 'light'
 // The React UMD builds live in test/vendor (committed, 1.2 MB) so the harness
 // runs offline on a fresh clone. --vendor DIR / REACT_VENDOR still override it;
 const VENDOR = flag('vendor', process.env.REACT_VENDOR ?? join(ROOT, 'test', 'vendor'))
@@ -69,7 +73,7 @@ copyFileSync(join(VENDOR, 'react.js'), join(stage, 'react.js'))
 copyFileSync(join(VENDOR, 'react-dom.js'), join(stage, 'react-dom.js'))
 
 // Served over http rather than opened as file://: localStorage (the card
-// remembers fast mode and the colour table) needs a real origin.
+// remembers the colour table) needs a real origin.
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8' }
 const server = createServer(async (request, response) => {
   const path = decodeURIComponent((request.url ?? '/').split('?')[0])
@@ -173,6 +177,7 @@ session = (await send('Target.attachToTarget', { targetId, flatten: true })).ses
 await send('Page.enable', {}, session)
 await send('Runtime.enable', {}, session)
 await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false }, session)
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: SCHEME }] }, session)
 await send('Page.navigate', { url }, session)
 
 let ready = false
@@ -298,7 +303,10 @@ try {
       '      var t = document.querySelector(' + JSON.stringify('[data-model-seat="model-trigger"]') + ')\n' +
       '      if (t === null) return null\n' +
       '      var part = function (sel) { var n = t.querySelector(sel); return n === null ? null : n.textContent }\n' +
-      '      return { provider: part(".gptm-triggerProvider"), slash: part(".gptm-triggerSlash"), model: part(".gptm-triggerModel") }\n' +
+      '      var box = function (sel) { var n = t.querySelector(sel); return n === null ? null : n.getBoundingClientRect() }\n' +
+      '      var p = box(".gptm-triggerProvider"), s = box(".gptm-triggerSlash")\n' +
+      '      return { provider: part(".gptm-triggerProvider"), slash: part(".gptm-triggerSlash"), label: part(".gptm-triggerModel"),\n' +
+      '        gapPS: p === null || s === null ? null : Math.round((s.left - p.right) * 10) / 10 }\n' +
       '    })(),\n' +
       '    providerRows: document.querySelectorAll(".ms-col[data-col=\\"providers\\"] .ms-row").length,\n' +
       '    modelRows: document.querySelectorAll(".ms-col[data-col=\\"models\\"] .ms-row").length,\n' +
@@ -325,14 +333,21 @@ try {
     shape !== null && shape.colsTop !== null && shape.colsTop <= 5,
     String(shape && shape.colsTop),
   )
+  // The three runs are one flex item, so the label reads "provider/model" with
+  // no space and no 4px gap anywhere between the runs.
   check(
-    'the trigger names provider and model, as in B',
+    'the trigger reads provider/model as one run of text',
     shape !== null &&
       shape.triggerParts !== null &&
       shape.triggerParts.provider === 'Provider 0' &&
       shape.triggerParts.slash === '/' &&
-      shape.triggerParts.model === 'p0 model 0',
+      shape.triggerParts.label === 'Provider 0/p0 model 0',
     JSON.stringify(shape && shape.triggerParts),
+  )
+  check(
+    'the slash touches the provider (no flex gap inside the label)',
+    shape !== null && shape.triggerParts !== null && Math.abs(shape.triggerParts.gapPS) <= 1.5,
+    String(shape && shape.triggerParts && shape.triggerParts.gapPS),
   )
   check('the long provider has a row', shape !== null && shape.providerRows === 6, String(shape && shape.providerRows))
   check('the model column lists the long provider', shape !== null && shape.modelRows === 60, String(shape && shape.modelRows))
@@ -490,7 +505,7 @@ try {
   )
   check('the card closes after the pick', await evaluate('document.querySelector(' + CARD_Q + ') === null'))
 
-  // ═══ 5. the thinking pane: slider, keyboard, fast toggle, long-press lock ══
+  // ═══ 5. the thinking pane: slider, keyboard, reset, always-on drift ═══════
   await clickAt(await centerOf(EFFORT_TRIGGER))
   await sleep(250)
   const effort = await evaluate(
@@ -505,15 +520,89 @@ try {
       '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),\n' +
       '    text: slider === null ? null : slider.getAttribute("aria-valuetext"),\n' +
       '    ticks: document.querySelectorAll(".gptm-ticks > *").length,\n' +
-      '    fastToggle: document.querySelector(".gptm-fastToggle") !== null,\n' +
-      '    panes: Array.from(document.querySelectorAll(".gptm-hint")).length\n' +
+      '    bolt: document.querySelector(".gptm-triggerBolt, .gptm-fastToggle") !== null,\n' +
+      '    trail: (function () { var t = document.querySelector(".gptm-trail"); return t === null ? null : getComputedStyle(t).opacity })(),\n' +
+      '    particles: document.querySelectorAll(".gptm-particle").length,\n' +
+      '    drift: (function () {\n' +
+      '      var p = document.querySelector(".gptm-particle")\n' +
+      '      if (p === null) return null\n' +
+      '      var c = getComputedStyle(p)\n' +
+      '      return { name: c.animationName, state: c.animationPlayState, spin: (c.getPropertyValue("--spin") || "").trim(), running: p.getAnimations ? p.getAnimations().length : null }\n' +
+      '    })(),\n' +
+      '    hints: document.querySelectorAll(".gptm-hint").length,\n' +
+      '    pane: el === null ? null : el.getAttribute("data-pane"),\n' +
+      '    box: el === null ? null : { width: Math.round(el.getBoundingClientRect().width), height: Math.round(el.getBoundingClientRect().height) },\n' +
+      '    contrast: (function () {\n' +
+      '      function parse(value) {\n' +
+      '        var m = /rgba?\\(([^)]+)\\)/.exec(String(value))\n' +
+      '        if (m === null) return null\n' +
+      '        var p = m[1].split(",").map(function (x) { return parseFloat(x) })\n' +
+      '        return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }\n' +
+      '      }\n' +
+      '      function lum(c) {\n' +
+      '        function ch(v) { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }\n' +
+      '        return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b)\n' +
+      '      }\n' +
+      '      function ratio(fg, bg) {\n' +
+      '        var a = lum(fg), b = lum(bg)\n' +
+      '        return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100\n' +
+      '      }\n' +
+      '      // A translucent layer is composited over its parents until the\n' +
+      '      // stack is opaque: that stack is the colour the eye sees.\n' +
+      '      function surface(el) {\n' +
+      '        var node = el\n' +
+      '        var top = null\n' +
+      '        while (node !== null) {\n' +
+      '          var c = parse(getComputedStyle(node).backgroundColor)\n' +
+      '          if (c !== null && c.a > 0.01) {\n' +
+      '            if (top === null) top = c\n' +
+      '            else return {\n' +
+      '              r: c.r * (1 - top.a) + top.r * top.a,\n' +
+      '              g: c.g * (1 - top.a) + top.g * top.a,\n' +
+      '              b: c.b * (1 - top.a) + top.b * top.a,\n' +
+      '              a: 1,\n' +
+      '            }\n' +
+      '          }\n' +
+      '          node = node.parentElement\n' +
+      '        }\n' +
+      '        return top === null ? { r: 255, g: 255, b: 255, a: 1 } : top\n' +
+      '      }\n' +
+      '      var card = document.querySelector(' + CARD_Q + ')\n' +
+      '      if (card === null) return null\n' +
+      '      var bg = surface(card)\n' +
+      '      function of(el) {\n' +
+      '        if (el === null) return null\n' +
+      '        var c = parse(getComputedStyle(el).color)\n' +
+      '        return c === null ? null : ratio(c, bg)\n' +
+      '      }\n' +
+      '      return {\n' +
+      '        reset: of(document.querySelector(".gptm-head .gptm-iconBtn:last-of-type")),\n' +
+      '        model: of(document.querySelector(".gptm-statusModel")),\n' +
+      '      }\n' +
+      '    })()\n' +
       '  }\n' +
       '})()',
   )
   check('the effort trigger opens the thinking pane', effort.slider === true, JSON.stringify(effort))
   check('the slider spans the three reasoning levels', effort.max === '2' && effort.now === '1', JSON.stringify([effort.max, effort.now]))
   check('the slider shows a tick per level', effort.ticks >= 3, String(effort.ticks))
-  check('the fast toggle is present', effort.fastToggle === true)
+  check('the thinking pane has no bolt control', effort.bolt === false, JSON.stringify(effort.bolt))
+  check('the drift trail is always on', effort.trail !== null && Number(effort.trail) >= 0.99, String(effort.trail))
+  check(
+    'the particles drift at full strength',
+    effort.particles === 42 && effort.drift !== null && effort.drift.name === 'gptm-drift' && effort.drift.spin === '1' && effort.drift.running === 1,
+    JSON.stringify({ particles: effort.particles, drift: effort.drift }),
+  )
+  // 0.1.3: the hold still locks, but the pane no longer spells it out.
+  check('the thinking pane shows no lock hint', effort.hints === 0, String(effort.hints))
+  // 0.1.3: the pane carries its own height. When the frozen model-grid frame
+  // won, the card stayed 'shape.height' tall with a short pane inside it.
+  check('the card shrinks to the thinking pane', effort.pane === 'thinking' && effort.box !== null && effort.box.height < 300, JSON.stringify(effort.box))
+  // 0.1.3: the pane sits on the host's card surface, so every icon and label on
+  // it has to be readable in both themes - the fixture used to serve one theme
+  // only, which hid white-on-white icons.
+  check('the reset icon reads on the card', effort.contrast !== null && effort.contrast.reset >= 3, JSON.stringify(effort.contrast))
+  check('the model line reads on the card', effort.contrast !== null && effort.contrast.model >= 4.5, JSON.stringify(effort.contrast))
   await shot('02-thinking-pane')
 
   const sliderFocused = await evaluate(
@@ -541,94 +630,49 @@ try {
     JSON.stringify(afterKey.selections),
   )
 
-  // Every probe below is written so a missing node reports a failed check with
-  // the state it found, instead of throwing and taking the rest of the run down.
-  // Selecting the top level flashes the quota hint for 1.35 s, and while it is
-  // up the head collapses its icon buttons (A's own behaviour). Waiting it out
-  // is part of the contract, not a workaround: the toggle has to come back.
+  // Fast mode has no switch left: the bolt, its lock and the long press are gone,
+  // and the trail runs unconditionally. What is left to probe in the head is the
+  // reset button beside the status title.
   await sleep(1700)
   const headReady = await evaluate(
     '(() => {\n' +
       '  var head = document.querySelector(".gptm-head")\n' +
-      '  var toggle = document.querySelector(".gptm-fastToggle")\n' +
-      '  var box = toggle === null ? null : toggle.getBoundingClientRect()\n' +
+      '  var btn = document.querySelector(".gptm-head .gptm-iconBtn")\n' +
+      '  var box = btn === null ? null : btn.getBoundingClientRect()\n' +
       '  var top = box === null ? null : document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)\n' +
       '  return {\n' +
       '    quota: head === null ? null : head.getAttribute("data-quota"),\n' +
-      '    toggle: toggle !== null,\n' +
-      '    topmost: top !== null && (top === toggle || toggle.contains(top))\n' +
+      '    reset: btn !== null,\n' +
+      '    topmost: top !== null && (top === btn || btn.contains(top))\n' +
       '  }\n' +
       '})()',
   )
-  check('the quota hint clears and the head folds back', headReady.quota === 'false' && headReady.toggle === true, JSON.stringify(headReady))
-  check('the fast toggle is the topmost node at its own centre', headReady.topmost === true, JSON.stringify(headReady))
+  check('the quota hint clears and the head folds back', headReady.quota === 'false' && headReady.reset === true, JSON.stringify(headReady))
+  check('the reset button is the topmost node at its own centre', headReady.topmost === true, JSON.stringify(headReady))
 
-  const fastPoint = await centerOf('.gptm-fastToggle')
-  check('the fast toggle is addressable', fastPoint !== null)
-  if (fastPoint !== null) {
-    await clickAt(fastPoint)
-    await sleep(250)
-  }
-  const fastOn = await evaluate(
-    '(() => {\n' +
-      '  var card = document.querySelector(' + CARD_Q + ')\n' +
-      '  var toggle = document.querySelector(".gptm-fastToggle")\n' +
-      '  var raw = localStorage.getItem("dsh-client-ui-model-seat:fast:v1")\n' +
-      '  return {\n' +
-      '    open: card !== null,\n' +
-      '    layout: card === null ? null : card.getAttribute("data-layout"),\n' +
-      '    menu: card === null ? null : card.getAttribute("data-fast"),\n' +
-      '    pressed: toggle === null ? null : toggle.getAttribute("aria-pressed"),\n' +
-      '    stored: raw === null ? null : JSON.parse(raw)\n' +
-      '  }\n' +
-      '})()',
-  )
-  check('a click turns fast mode on', fastOn.menu === 'true' && fastOn.pressed === 'true', JSON.stringify(fastOn))
-  check('fast mode is persisted under the new key', fastOn.stored !== null && fastOn.stored.fast === true, JSON.stringify(fastOn.stored))
-
-  // Holding the button is the lock; a click is not.
-  const holdPoint = await centerOf('.gptm-fastToggle')
-  check('the fast toggle stays on screen after the click', holdPoint !== null, JSON.stringify(fastOn))
-  if (holdPoint !== null) {
-    await moveTo(holdPoint)
-    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: holdPoint.x, y: holdPoint.y, button: 'left', buttons: 1, clickCount: 1 }, session)
-    await sleep(700)
-    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: holdPoint.x, y: holdPoint.y, button: 'left', buttons: 0, clickCount: 1 }, session)
+  const resetPoint = await centerOf('.gptm-head .gptm-iconBtn')
+  check('the reset button is addressable', resetPoint !== null)
+  if (resetPoint !== null) {
+    await clickAt(resetPoint)
     await sleep(300)
   }
-  const locked = await evaluate(
+  const afterReset = await evaluate(
     '(() => {\n' +
-      '  var trigger = document.querySelector(' + JSON.stringify(EFFORT_TRIGGER) + ')\n' +
-      '  var card = document.querySelector(' + CARD_Q + ')\n' +
-      '  var raw = localStorage.getItem("dsh-client-ui-model-seat:fast:v1")\n' +
+      '  var slider = document.querySelector(".gptm-slider")\n' +
       '  return {\n' +
-      '    trigger: trigger === null ? null : trigger.getAttribute("data-locked"),\n' +
-      '    menu: card === null ? null : card.getAttribute("data-locked"),\n' +
-      '    stored: raw === null ? null : JSON.parse(raw)\n' +
+      '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),\n' +
+      '    selections: window.__selections ?? [],\n' +
+      '    fastStore: localStorage.getItem("dsh-client-ui-model-seat:fast:v1")\n' +
       '  }\n' +
       '})()',
   )
-  check('holding the fast toggle locks it', locked.trigger === 'true' && locked.menu === 'true', JSON.stringify(locked))
-  check('the lock is persisted too', locked.stored !== null && locked.stored.locked === true, JSON.stringify(locked.stored))
-
-  // Holding again releases the lock, and the level stays where it was.
-  const releasePoint = await centerOf('.gptm-fastToggle')
-  if (releasePoint !== null) {
-    await moveTo(releasePoint)
-    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: releasePoint.x, y: releasePoint.y, button: 'left', buttons: 1, clickCount: 1 }, session)
-    await sleep(700)
-    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: releasePoint.x, y: releasePoint.y, button: 'left', buttons: 0, clickCount: 1 }, session)
-    await sleep(300)
-  }
-  const unlocked = await evaluate(
-    '(() => {\n' +
-      '  var card = document.querySelector(' + CARD_Q + ')\n' +
-      '  var raw = localStorage.getItem("dsh-client-ui-model-seat:fast:v1")\n' +
-      '  return { open: card !== null, stored: raw === null ? null : JSON.parse(raw) }\n' +
-      '})()',
+  check('the reset button restores the model default level', afterReset.now === '1', String(afterReset.now))
+  check(
+    'the reset submits the default effort',
+    afterReset.selections.length === 3 && afterReset.selections[2].reasoningEffort === 'medium',
+    JSON.stringify(afterReset.selections),
   )
-  check('holding again releases the lock', unlocked.stored !== null && unlocked.stored.locked === false, JSON.stringify(unlocked))
-
+  check('nothing writes the retired fast-mode key', afterReset.fastStore === null, String(afterReset.fastStore))
   // ═══ 6. the thinking pane's head switches back to the model columns ════════
   await key('Escape', 'Escape', 27)
   await sleep(150)
@@ -672,7 +716,10 @@ try {
     reopened: { height: reopened.height, changes: reopened.changes },
     filtered,
     selections: await evaluate('window.__selections ?? []'),
-    fast: { on: fastOn, locked, unlocked },
+    drift: { trail: effort.trail, particles: effort.particles, animation: effort.drift },
+    scheme: SCHEME,
+    thinking: { slider: effort.slider, max: effort.max, now: effort.now, ticks: effort.ticks, hints: effort.hints },
+    pane: { pane: effort.pane, box: effort.box, contrast: effort.contrast },
     problems,
     shots,
   }

@@ -4,6 +4,45 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-28
+
+**破坏性变更**：快速模式的开关与 `600 ms` 长按锁整套删除，粒子滑轨的漂移改为**常开**。界面与 0.1.2 相比少了一个闪电按钮与面板头部的一个开关，卡片几何、存储键、DOM 钩子都没变，不需要重装或迁移。
+
+### Added
+
+- `npm run docs`（`scripts/doc-anchor-check.mjs`）：校验 `MAINTENANCE.md` 里每个「符号（行号）」锚点与区间是否还落在 `client.js` 内，并顺带核对文首自称的行数与 `BUILD` 版本；已挂进 `npm run check`。
+- `README.zh.md`：与英文版等价的中文说明，两份顶部互加语言开关；已加入 `files`（制品 13 个文件）。
+- `.github/workflows/ci.yml`：推到 `main` / 每个 PR / 手动触发时跑 `npm run check` 与真 Edge 的 `npm run e2e`，截图作为 artifact 留存 14 天。
+- `scripts/shots.mjs --scheme light|dark`：截图脚本可显式指定配色方案。
+- `npm run e2e:dark`：`browser-check` 新增 `--scheme light|dark`（默认 light），报告多出 `scheme` 与 `pane` 两段；CI 浅深各跑一遍，截图仍只留浅色那一轮。
+- 夹具 `test/harness/index.html` 补齐宿主 alias token：`--dsw-*` 18 个，浅深各一套（此前一个都没定义，页面底色写死，浅色主题的问题在夹具里根本测不出来）。
+
+### Changed
+
+- `npm run check` 从 6 道闸变 7 道（新增 `docs`）。
+- `css-audit` 计数一路变化，按发生顺序记：190 / 202（0.1.2 基线）→ 191 / 203（斜杠去掉颜色，不带颜色的规则不再生成浅深两份副本）→ 200 / 212（`--c-menu-*` 补 light 值，卡面上 10 条规则各多一份 dark 副本）→ **173 / 183**（本轮删掉闪电开关与长按锁：含 `--c-*` 的整条规则删 −1，两侧同色的 token 删 −2）。`validate` 从 80 项变 **82** 项。
+- `browser-check` 第 5 段：原本验长按锁的两段换成验复位按钮，新增「面板里没有闪电控件」「轨道常亮」「42 个粒子在跑且 `--spin=1`」「旧 `…:fast:v1` 没人写」四条断言；`validate` 新增 `no fast-mode store` / `no fast-mode switch` / `no bolt or lock drawing`。
+- 三张 README 截图重出：列宽从 340 到 416 的改动对上，配色跟随深色方案。
+- 触发器读作 `供应商/模型名` 一串字：三段（provider / 斜杠 / 模型）包进同一个 flex item，按钮的 `gap: 4px` 只留在标签与箭头之间，斜杠两侧间距为 0；斜杠去掉负边距与灰色 caret token，颜色继承文字色（副作用：`css-audit` 从 193 规则 / 205 选择器变成 191 / 203——不带颜色的规则不再生成浅深两份覆盖副本）。e2e 增加了「整段文本无空格」与「斜杠与 provider 间距 ≤1.5px」两条断言。
+
+### Fixed
+
+- 从模型两列切到思考面板后卡片高度被上一布局的冻结高度夹住：`carry` 现在只在同一个 `frameKey` 内生效（锚点相同、布局或状态变了就重新量），`measure()` 也先按本布局宽度写 `card.style.width` 再量。实测思考面板 300×132（此前被夹在 416×420 里）。
+- 浅色主题下思考面板的闪电、刷新图标与模型名和卡片同色：`--c-menu-*` 一组的 light 值原本与 dark 相同（白色），而面板底色取自宿主的 `--dsw-alias-bg-layer-1`，浅色主题下就是白卡。现在两侧各自给值；e2e 新增对比度断言（light 复位图标 10.09 / 模型行 15.34，dark 16.53 / 13.71 —— 闪电那一对随开关一起消失）。
+- `scripts/shots.mjs --out <新目录>` 报 ENOENT：`mkdirSync(OUT)` 原本排在截图之后，现在提前到第一次写入之前。
+- 截图里的触发器看着发灰：headless 浏览器默认浅色方案，而插件的 token 定义在 `prefers-color-scheme: dark` 下，于是暗底上画了浅色 token。截图脚本现在先 `Emulation.setEmulatedMedia` 再导航，并把页面底色对齐卡片背景。
+
+### Removed
+
+- 快速模式的**整套开关**：触发器上的闪电、思考面板头部的开关按钮、`Bolt` / `LockMark` / `LockIcon` 三个绘制函数、`600 ms` 长按锁、`…:fast:v1` 持久化与它的两条重读监听、`tremble` 怠速态、`data-fast` / `data-locked` / `data-tremble` 三种状态属性、`fast.label` / `fast.locked` 词条，以及只给它们用的 5 个 token。粒子滑轨的漂移改为**常开**（`.gptm-trail` 基础 `opacity: 1`，`--spin: 1`），思考面板头部从「状态 + 开关 + 复位」收成「状态 + 复位」。旧键既不读也不写，回滚到 0.1.3 时锁定状态还在。
+- 0.1.3 删掉的那条提示行「长按闪电锁定／解锁快速模式」的两个 `title` 出口（快速开关按钮、状态按钮锁定态）随之消失。
+
+### Upgrade
+
+- 装了 0.1.2 的不用重装：配色仍存在 `dsh-client-ui-model-seat:config:v1`；`0.1.3` 从未发布，所以没有「升级到 0.1.3 再升级」这一步。
+- 旧的 `…:fast:v1` 既不读也不写：回滚到 0.1.2 时锁定状态还在，不需要手动清理。
+- 本机用 `link:` 装的：**完全退出 DeepSeek 再启动**才会加载新 bundle（插件在 profile 启动时挂载，热重载不管用）。
+
 ## [0.1.2] - 2026-10-28
 
 界面与 0.1.1 一致，这一版把发布通道和文档补齐，npm 通道从这一版开通。

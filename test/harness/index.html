@@ -4,9 +4,59 @@
 <meta charset="utf-8">
 <title>model-seat harness</title>
 <style>
-  html, body { margin: 0; height: 100%; font: 13px/1.4 system-ui, "Segoe UI", sans-serif; background: #0f1115; color: #e8eaed; }
+  /* The host's alias tokens, so the fixture renders the way the app does.
+     DSH defines these from its theme (they are not in the plugin's sheet), and
+     without them every `var(--dsw-*)` declaration in the bundle resolves to
+     nothing — a transparent card and inherited text colour, which hides exactly
+     the contrast defects this page is supposed to surface. Values mirror the
+     app's light and dark surfaces. */
+  :root {
+    --dsw-alias-label-primary: #242527;
+    --dsw-alias-label-secondary: #585b60;
+    --dsw-alias-label-tertiary: #77797d;
+    --dsw-alias-label-caption: #8b8f96;
+    --dsw-alias-label-dimmed: #a8adb6;
+    --dsw-alias-bg-base: #ffffff;
+    --dsw-alias-bg-layer-1: #ffffff;
+    --dsw-alias-border-l1: #e6eaef;
+    --dsw-alias-border-l2: #eef1f5;
+    --dsw-alias-border-l3: #cbd3de;
+    --dsw-alias-interactive-bg-hover: rgba(20, 30, 45, .06);
+    --dsw-alias-interactive-bg-hover-danger: rgba(220, 60, 60, .1);
+    --dsw-alias-state-business-primary: #4d7df4;
+    --dsw-alias-state-error-primary: #e5484d;
+    --dsw-elevation-prominent: 0 16px 42px rgba(16, 24, 40, .14);
+    --dsw-focus-ring-color: #4d7df4;
+    --dsw-radius-md: 8px;
+    --dsw-radius-sm: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --dsw-alias-label-primary: #e8eaed;
+      --dsw-alias-label-secondary: #b6bcc6;
+      --dsw-alias-label-tertiary: #8d95a1;
+      --dsw-alias-label-caption: #7d8590;
+      --dsw-alias-label-dimmed: #6b7280;
+      --dsw-alias-bg-base: #0f1115;
+      --dsw-alias-bg-layer-1: #1b1f26;
+      --dsw-alias-border-l1: #2b3240;
+      --dsw-alias-border-l2: #232936;
+      --dsw-alias-border-l3: #3a4353;
+      --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, .08);
+      --dsw-alias-interactive-bg-hover-danger: rgba(255, 90, 90, .16);
+      --dsw-alias-state-business-primary: #7fa8ff;
+      --dsw-alias-state-error-primary: #ff6b6b;
+      --dsw-elevation-prominent: 0 16px 42px rgba(0, 0, 0, .5);
+      --dsw-focus-ring-color: #7fa8ff;
+    }
+  }
+  html, body {
+    margin: 0; height: 100%;
+    font: 13px/1.4 system-ui, "Segoe UI", sans-serif;
+    background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary);
+  }
   #stage { position: fixed; left: 0; right: 0; bottom: 0; height: 120px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 0 24px 24px; box-sizing: border-box; }
-  #transcript { position: absolute; inset: 0 0 120px 0; overflow: hidden; color: #444; }
+  #transcript { position: absolute; inset: 0 0 120px 0; overflow: hidden; color: var(--dsw-alias-label-tertiary); }
 </style>
 </head>
 <body>

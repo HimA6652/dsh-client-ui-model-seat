@@ -7,7 +7,11 @@
  * trigger, at 2x, so the listing shows the control and nothing else.
  *
  * Usage: node scripts/shots.mjs [--vendor DIR] [--browser PATH] [--port 9334]
- *                               [--scale 2] [--out assets]
+ *                               [--scale 2] [--out assets] [--scheme dark|light]
+ *   --scheme  which theme the shots are taken in (default dark). The bundle emits
+ *             its tokens inside @media (prefers-color-scheme: dark), so a headless
+ *             browser left on the default "light" paints the light-theme greys on
+ *             the dark page — the reason the trigger once looked washed out here.
  * Writes screenshot-1.png (columns), screenshot-2.png (search across
  * providers), screenshot-3.png (thinking pane) and prints their sizes.
  */
@@ -33,6 +37,7 @@ const BROWSER = flag('browser', 'C:/Program Files (x86)/Microsoft/Edge/Applicati
 const PORT = Number(flag('port', '9334'))
 const SCALE = Number(flag('scale', '2'))
 const OUT = resolve(ROOT, flag('out', 'assets'))
+const SCHEME = flag('scheme', 'dark') === 'light' ? 'light' : 'dark'
 
 if (!existsSync(join(VENDOR, 'react.js')) || !existsSync(join(VENDOR, 'react-dom.js'))) {
   console.error('shots: no react vendor in ' + VENDOR)
@@ -135,12 +140,15 @@ const send = (method, params, sessionId) => {
 }
 
 const written = []
+mkdirSync(OUT, { recursive: true })
 try {
   const created = await send('Target.createTarget', { url: 'about:blank' })
   const session = (await send('Target.attachToTarget', { targetId: created.targetId, flatten: true })).sessionId
   await send('Page.enable', {}, session)
   await send('Runtime.enable', {}, session)
   await send('Emulation.setDeviceMetricsOverride', { width: 1200, height: 900, deviceScaleFactor: 1, mobile: false }, session)
+  // The page must be read in the theme whose tokens it renders with.
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: SCHEME }] }, session)
 
   const evaluate = async (expression) => {
     const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }, session)
@@ -194,6 +202,15 @@ try {
   const navigate = async () => {
     await send('Page.navigate', { url: origin + '/index.html?demo=1&current=4' }, session)
     await waitFor('window.__ready === true', 'harness')
+    // The canvas, not the card: on the harness's own #0f1115 the card edge and
+    // its shadow disappear, and a storefront thumbnail turns into a black square.
+    // A one step lighter surface keeps every colour the app itself would paint.
+    const canvas = SCHEME === 'light' ? '#f6f7f9' : '#1a1d22'
+    const transcript = SCHEME === 'light' ? '#d8dbe0' : '#4b5058'
+    await evaluate(
+      '(() => { document.body.style.background = ' + JSON.stringify(canvas) + ';' +
+        ' document.getElementById("transcript").style.color = ' + JSON.stringify(transcript) + ' })()',
+    )
   }
 
   // 1 — the two-column card, a provider with enough models to scroll.
@@ -215,7 +232,7 @@ try {
   await sleep(300)
   await shoot(['[data-model-seat="menu"]', '[data-model-seat="model-trigger"]'], 'screenshot-2.png')
 
-  // 3 — the thinking pane: particle slider, fast toggle, lock hint.
+  // 3 — the thinking pane: the particle slider and its status head.
   await navigate()
   await click('[data-model-seat="effort-trigger"]')
   await waitFor('document.querySelector("[data-model-seat=menu] .gptm-slider") !== null', 'thinking pane')
@@ -232,5 +249,4 @@ try {
   rmSync(stage, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 }
 
-mkdirSync(OUT, { recursive: true })
 console.log(JSON.stringify({ out: OUT, shots: written }, null, 1))

@@ -114,7 +114,12 @@ check('no model-provider-prefix id', !/dsh-model-provider-prefix'/.test(bundleSo
 check('no upstream config key', !/dsh-client-ui-gpt-helper:config:v1/.test(bundleSource))
 check('no upstream fast key', !/dsh-client-ui-gpt-helper:fast:v1/.test(bundleSource))
 check('no watchdog aliases', !/data-dsh-pm-/.test(bundleSource))
-check('seat keys present', /dsh-client-ui-model-seat:config:v1/.test(bundleSource) && /dsh-client-ui-model-seat:fast:v1/.test(bundleSource))
+check('seat config key present', /dsh-client-ui-model-seat:config:v1/.test(bundleSource))
+// Fast mode is pinned on: the store, its key and the long press are gone, so a
+// bundle that still mentions the key is one that still has the switch in it.
+check('no fast-mode store', !/dsh-client-ui-model-seat:fast:v1/.test(bundleSource))
+check('no fast-mode switch', !/fast-toggle|fastToggle|useFastLock|LONG_PRESS_MS/.test(bundleSource))
+check('no bolt or lock drawing', !/function (Bolt|LockIcon|LockMark)\(/.test(bundleSource))
 
 // The upstream aliases are gone as of 0.1.1: this machine never had the original
 // plugin installed, so no third-party CSS can hang off them. Everything the
@@ -126,7 +131,6 @@ const SEAT_VALUES = [
   'model-trigger',
   'effort-trigger',
   'thinking-slider',
-  'fast-toggle',
   'config-panel',
   'config-backdrop',
 ]

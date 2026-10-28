@@ -357,7 +357,7 @@ try {
       '    slider: slider !== null,',
       '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),',
       '    max: slider === null ? null : slider.getAttribute("aria-valuemax"),',
-      '    fast: document.querySelector(".gptm-fastToggle") !== null',
+      '    bolt: document.querySelector(".gptm-triggerBolt, .gptm-fastToggle") !== null',
       '  }',
       '})()',
     ]),
@@ -376,16 +376,47 @@ try {
         '    search: document.querySelector(".ms-col[data-col=models] .ms-search") !== null,',
         '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),',
         '    max: slider === null ? null : slider.getAttribute("aria-valuemax"),',
-        '    fast: document.querySelector(".gptm-fastToggle") !== null,',
-        '    height: el === null ? null : Math.round(el.getBoundingClientRect().height)',
+        '    bolt: document.querySelector(".gptm-triggerBolt, .gptm-fastToggle") !== null,' +
+        '    trail: (function () { var t = document.querySelector(".gptm-trail"); return t === null ? null : getComputedStyle(t).opacity })(),' +
+        '    particles: document.querySelectorAll(".gptm-particle").length,' +
+        '    drift: (function () { var p = document.querySelector(".gptm-particle"); if (p === null) return null; var c = getComputedStyle(p); return { name: c.animationName, spin: (c.getPropertyValue("--spin") || "").trim(), running: p.getAnimations ? p.getAnimations().length : null } })(),',
+        '    height: el === null ? null : Math.round(el.getBoundingClientRect().height),',
+        '    box: el === null ? null : { width: Math.round(el.getBoundingClientRect().width), height: Math.round(el.getBoundingClientRect().height) },',
+        '    contrast: (function () {',
+        '      function P(v) { var m = /rgba?\\(([^)]+)\\)/.exec(String(v)); if (m === null) return null; var p = m[1].split(",").map(parseFloat); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 } }',
+        '      function L(c) { function k(v) { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) } return 0.2126 * k(c.r) + 0.7152 * k(c.g) + 0.0722 * k(c.b) }',
+        '      function R(f, b) { var x = L(f), y = L(b); return Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100 }',
+        '      function S(n) { var t = null; while (n !== null) { var c = P(getComputedStyle(n).backgroundColor); if (c !== null && c.a > 0.01) { if (t === null) t = c; else return { r: c.r * (1 - t.a) + t.r * t.a, g: c.g * (1 - t.a) + t.g * t.a, b: c.b * (1 - t.a) + t.b * t.a } } n = n.parentElement } return t === null ? { r: 255, g: 255, b: 255 } : t }',
+        '      function C(sel) { var n = document.querySelector(sel); if (n === null) return null; var c = P(getComputedStyle(n).color); return c === null ? null : R(c, S(el)) }',
+        '      return { reset: C(".gptm-head .gptm-iconBtn:last-of-type"), model: C(".gptm-statusModel") }',
+        '    })(),',
         '  }',
         '})()',
       ]),
     )
     check('the effort trigger opens the thinking pane', pane.slider === true, JSON.stringify(pane))
     check('the thinking pane carries no model search box', pane.search === false, JSON.stringify(pane))
-    check('the thinking pane keeps the fast toggle', pane.fast === true, JSON.stringify(pane))
+    check('the thinking pane has no bolt control', pane.bolt === false, JSON.stringify(pane.bolt))
+    check('the drift trail is always on', pane.trail !== null && Number(pane.trail) >= 0.99, String(pane.trail))
+    check(
+      'the particles drift at full strength',
+      pane.particles === 42 && pane.drift !== null && pane.drift.name === 'gptm-drift' && pane.drift.spin === '1' && pane.drift.running === 1,
+      JSON.stringify({ particles: pane.particles, drift: pane.drift }),
+    )
     check('the thinking pane keeps one frozen height', typeof pane.height === 'number', String(pane.height))
+    check('the card shrinks to the thinking pane', pane.box.height < 300, JSON.stringify(pane.box))
+    check('the pane icon reads on the card surface', pane.contrast.reset >= 3, JSON.stringify(pane.contrast))
+    check('the pane model line reads on the card surface', pane.contrast.model >= 4.5, JSON.stringify(pane.contrast))
+    // The defect the user reported: switching panes used to keep the columns'
+    // frozen 420px on the shorter panel. Going back must restore both.
+    await clickAt(await centerOf('.gptm-status'))
+    await sleep(600)
+    const backToColumns = await evaluate(
+      '(() => { var el = document.querySelector(' + q(CARD) + '); if (el === null) return null; var r = el.getBoundingClientRect(); return { width: Math.round(r.width), height: Math.round(r.height), columns: document.querySelector(".ms-cols") !== null } })()',
+    )
+    check('switching back restores the two columns', backToColumns !== null && backToColumns.columns === true, JSON.stringify(backToColumns))
+    check('the columns are taller than the pane was', backToColumns !== null && backToColumns.height > pane.box.height + 80, JSON.stringify([pane.box.height, backToColumns === null ? null : backToColumns.height]))
+    pane = Object.assign({}, pane, { backToColumns: backToColumns })
   } else {
     check('no effort trigger exists for a model with no levels', thinking.slider === false, JSON.stringify(thinking))
   }

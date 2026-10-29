@@ -3,7 +3,7 @@
 > 目标：让 `dsh-client-ui-model-seat` 出现在 dsh 的「插件市场 → 发现」里，并能一键安装。
 > 本文所有结论都标注了来源；推断项标注「待确认」。今天是 2026-10-28（Asia/Shanghai）。
 
-**当前状态（2026-10-28 更新）**：仓库已公开，`v0.1.1` / `v0.1.2` / `v0.2.0` 三个标签都推了，`github:HimA6652/dsh-client-ui-model-seat` 与 npm 的 `dsh-client-ui-model-seat@0.2.0` 都实测可装。npm 已发布，所以条目里仍然不写 npm 字段——市场 CI 会自己探测 npm 与 star 数（探测到之后安装串会自动变成 `dsh plugin add dsh-client-ui-model-seat`）。提交 PR 之前必须做的两件事：① 先把仓库里的 `scripts/` 自检跑绿（`npm run check`），② 克隆 `awesome-dsh-plugin` 并在本地跑它自己的校验脚本（规范要求：提第三方清单前先跑对方校验器）。
+**当前状态（2026-10-29 更新）**：仓库已公开，`v0.1.1` / `v0.1.2` / `v0.2.0` / `v0.2.1` 四个标签都推了，`github:HimA6652/dsh-client-ui-model-seat` 与 npm 的 `dsh-client-ui-model-seat@0.2.1` 都实测可装；清单 PR **#10053** 已开、`Submission gate` 与 `check` 全绿，等维护者合并。npm 已发布，所以条目里仍然不写 npm 字段——市场 CI 会自己探测 npm 与 star 数（探测到之后安装串会自动变成 `dsh plugin add dsh-client-ui-model-seat`）。提交 PR 之前必须做的两件事：① 先把仓库里的 `scripts/` 自检跑绿（`npm run check`），② 克隆 `awesome-dsh-plugin` 并在本地跑它自己的校验脚本（规范要求：提第三方清单前先跑对方校验器）。
 
 ## 0. 结论先行
 
@@ -86,7 +86,7 @@ tarball: https://github.com/zszz3/dsh-model-provider-prefix/releases/download/v0
 | `https://github.com` | 连不上 | 不要用 HTTPS 克隆/推送 |
 | `https://api.github.com` | 走 `curl --ssl-no-revoke` 返回 200（schannel 吊销检查离线，不加参数报 `CRYPT_E_REVOCATION_OFFLINE`） | 有 token 时可用 REST |
 | npm registry | 直连正常，已登录 `hima6652` | 可以直接 `npm publish` |
-| npm 包名 | `dsh-client-ui-model-seat` 已由本仓库占用（`0.2.0`）；两个上游仍然是 404 | 先到先得，上游若要发包得改名 |
+| npm 包名 | `dsh-client-ui-model-seat` 已由本仓库占用（`0.2.1`）；两个上游仍然是 404 | 先到先得，上游若要发包得改名 |
 | 本机安装方式 | 已是 `link:E:\...\dsh-client-ui-model-seat` 进 desktop profile | 上架不改变本机行为 |
 
 ## 4. 九步实施

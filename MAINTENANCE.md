@@ -747,16 +747,16 @@ npm run release 0.2.0 --no-push     # 提交 + 标签，不推
 
 | 渠道 | 现状 | 对齐要求 |
 | --- | --- | --- |
-| git 标签 | `v0.2.0` 已推（annotated `fa57ea3`，peeled `9b13e9a`）；此前 `v0.1.2` annotated `4ca9f6b` / peeled `eb8ba43` | 与 `package.json` 的 `version` 一致 |
+| git 标签 | `v0.2.1` 已推（annotated `8972323`，peeled `721f591`）；此前 `v0.2.0` annotated `fa57ea3` / peeled `9b13e9a`、`v0.1.2` annotated `4ca9f6b` / peeled `eb8ba43` | 与 `package.json` 的 `version` 一致 |
 | GitHub Release | 由 `.github/workflows/release.yml` 在 `v*` 标签上自动创建，正文取 `CHANGELOG.md` 同版本小节 | 发之前把正文里的旧措辞重扫一遍 |
-| npm | 已发布 `0.2.0`（2026-10-28T10:37:58Z，13 文件 232.7 kB）与 `0.1.2`（06:38:18Z）；`0.0.0-stage` 是首次发布的占位版本，已 deprecate | 用 `npm run release <ver>` 发，tag / Release / npm 三者同号 |
-| dsh 插件市场 | 尚未提 PR（见 `MARKET.md`） | 提 PR 前先克隆 `awesome-dsh-plugin` 跑它自己的校验脚本 |
+| npm | 已发布 `0.2.1`（2026-10-29T07:26:03Z，13 文件 243.9 kB / 解包 390.7 kB，shasum `2cd8659`）、`0.2.0`（2026-10-28T10:37:58Z，232.7 kB）与 `0.1.2`（06:38:18Z）；`0.0.0-stage` 是首次发布的占位版本，已 deprecate | 用 `npm run release <ver>` 发，tag / Release / npm 三者同号 |
+| dsh 插件市场 | PR **#10053**（`Add HimA6652/dsh-client-ui-model-seat (ui)`）已开、`Submission gate` 与 `check` 全绿，等维护者合并（见 `MARKET.md`） | 合并后再核对市场页的安装串；上游补 deprecated 的提议写在 PR 正文里 |
 
 ### 19.7 已记录的决策
 
 - **不改写 git 历史**。首次推送用了 `git add -A` 与散文式提交说明，当时没有任何 npm 制品，改写历史的收益低于风险。从现在起按规范提交，历史留档；这条决定本身写在这里，免得下一个人以为是忘了。
 - **`v0.1.1` 标签早于 `CHANGELOG.md`**。当时的 Release 正文是手写的。**不要**移动或重打 `v0.1.1`：下一个版本号走 `release.mjs`，三条渠道重新对齐。
-- **带 CHANGELOG 的 Release 从 `0.1.2` 起**。`0.1.2`、`0.2.0` 都是 `release.mjs` 发的、正文取自 CHANGELOG；下一个版本号从 `0.2.1` 起。
+- **带 CHANGELOG 的 Release 从 `0.1.2` 起**。`0.1.2`、`0.2.0`、`0.2.1` 都是 `release.mjs` 发的、正文取自 CHANGELOG；下一个版本号从 `0.2.2` 起。
 - **“先不发”是四层意思**：① 不写版本说明 ② 不提交 ③ 不推送 ④ 不打标签/不发 npm。听到这四个字先问是哪一层，默认按 ①+② 处理（改完留在工作区）。
 
 ### 19.8 提交信息规范

@@ -792,4 +792,6 @@ $env:GITHUB_TOKEN = '...'   # 只读 token 即可；本机现存凭据是 ylh440
 
 因此 `ci.yml` 的两个 e2e 步骤在失败时会把日志里匹配 `"the ` / `threw` / `browser-check:` / `no react vendor` / `never opened port` / `"problems"` 的那几行 `::error::` 出来 —— 断言失败的具体文案就靠在 annotation 里。
 
+第二个真发现打的是同一张牌（发布 0.2.1 之后连红三个 run：`721f591` → `40835311229`、`790fb81` → `40835687184`、`ee20704` → `40835906266`，annotation 里是 `"the hand-over names the level it replaced — {"label":"Back to the level before the bolt"}"` 这类英文标签）：**夹具的语言跟着浏览器走**，而断言写的是中文。修法是把语言也变成显式输入 —— 夹具读 `?lang=zh|en` 并暴露 `window.__lang`，`browser-check` 每次导航都带 `lang=zh`、启动参数带 `--lang=zh-CN`、并断言 `window.__lang === 'zh'`。弯路记一笔：`Emulation.setLocaleOverride` **无效**，独立探针实测它只影响 `Intl`，`navigator.language` 前后都是 `en-US`。
+
 首跑（run `40673400351`）红的就是这条链路的第一个真发现：runner 的系统开了「减少动效」，`prefers-reduced-motion: reduce` 让 `.gptm-particle` 的 `animation-name` 算成 `none`，「粒子以满强度漂移」被误判。修法是两边都显式 `Emulation.setEmulatedMedia` 钉住 `prefers-reduced-motion`，并把 `reduce` 分支写成反向断言（见 `browser-check` 第 5b 段）。**本地绿 / CI 红**时优先怀疑三件事：媒体特性默认值、慢机器上的采样帧数、Node 版本差异（CI 用 22，本机 24）。

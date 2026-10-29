@@ -140,6 +140,7 @@ if (version === null) {
       '--no-default-browser-check',
       '--disable-gpu',
       '--hide-scrollbars',
+      '--lang=zh-CN',
       'about:blank',
     ],
     { stdio: 'ignore' },
@@ -188,7 +189,7 @@ const evaluate = async (expression) => {
   return result.result.value
 }
 
-const QUERY = '/index.html?providers=6&models=60&long=0&current=0'
+const QUERY = '/index.html?providers=6&models=60&long=0&current=0&lang=zh'
 const url = origin + QUERY
 const altUrl = altOrigin + QUERY
 const lastUrl = lastOrigin + QUERY + '&session=session-9'
@@ -206,6 +207,10 @@ const MEDIA = [
   { name: 'prefers-reduced-motion', value: 'no-preference' },
 ]
 await send('Emulation.setEmulatedMedia', { features: MEDIA }, session)
+// The language is pinned in the URL (?lang=zh), not through
+// Emulation.setLocaleOverride: that call only touches Intl, navigator.language
+// stays en-US, and the harness reads navigator.language. A CI runner with an
+// en-US browser would otherwise fail every label assertion.
 await send('Page.navigate', { url }, session)
 
 let ready = false
@@ -218,6 +223,9 @@ if (!check('harness mounts the seat', ready)) {
   closeServers()
   process.exit(1)
 }
+
+const spokenLang = await evaluate('window.__lang').catch(() => null)
+check('the fixture speaks the pinned language', spokenLang === 'zh', JSON.stringify({ spokenLang, navigator: await evaluate('navigator.language').catch(() => null) }))
 
 const CARD = '[data-model-seat="menu"]'
 const CARD_Q = JSON.stringify(CARD)
@@ -1122,6 +1130,7 @@ try {
     selections: await evaluate('window.__selections ?? []'),
     drift: { trail: effort.trail, particles: effort.particles, animation: effort.drift },
     scheme: SCHEME,
+    lang: spokenLang,
     thinking: { slider: effort.slider, max: effort.max, now: effort.now, ticks: effort.ticks, hints: effort.hints },
     pane: { pane: effort.pane, box: effort.box, contrast: effort.contrast, inset: effort.inset },
     bolt: {

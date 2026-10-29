@@ -135,10 +135,18 @@
   // The app hands a slot component its translations through the `locale` field
   // it declared at registration; the harness does the same, from the dictionary
   // the plugin registered.
+  // ?lang=zh|en pins the language. Without it the harness follows the browser,
+  // which on a CI runner is en-US while the assertions read the Chinese
+  // dictionary.
+  var forcedLang = new URLSearchParams(location.search).get('lang')
+  var lang = forcedLang === 'zh' || forcedLang === 'en'
+    ? forcedLang
+    : (/^zh/i.test(navigator.language || 'zh') ? 'zh' : 'en')
+  window.__lang = lang
+
   function translator(namespace) {
     var entry = dictionaries.filter(function (item) { return item.namespace === namespace }).pop()
     var dict = entry === undefined ? {} : entry.dict
-    var lang = /^zh/i.test(navigator.language || 'zh') ? 'zh' : 'en'
     var table = dict[lang] || dict.zh || dict.en || {}
     return function (key, vars) {
       var text = Object.prototype.hasOwnProperty.call(table, key) ? table[key] : key

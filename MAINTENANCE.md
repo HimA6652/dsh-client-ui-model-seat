@@ -741,7 +741,8 @@ npm run release 0.2.0 --no-push     # 提交 + 标签，不推
 首次发布（0.1.2）踩到的两个坑，记在这里免得下次当成事故：
 
 - `npm publish` 打印 `+ pkg@x.y.z` 与 "being processed and may take a few minutes" 之后，注册表 packument 会先只有一条 `0.0.0-stage`（描述写着 "Temporary package placeholder for staged publishing"），大约 1 分钟后真版本才落到 `dist-tags.latest`。**不要因此重跑 publish**，用 `npm view <pkg> version` 复核即可。这个占位版本用 `npm deprecate <pkg>@0.0.0-stage "<说明>"` 标注，别 `unpublish`。
-- pnpm 11 默认带 `minimumReleaseAge`，刚发出去的版本会被写进 profile 的 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude` 才能装；开了 `minimumReleaseAgeStrict` 的 profile 会先弹一次确认。这是 pnpm 的供应链保护，不是插件问题。
+- pnpm 11 默认带 `minimumReleaseAge`（**1440 分钟**）供应链闸门，**写死版本**安装时 pnpm 会把该版本记进 profile 的 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude`（`--profile … add dsh-client-ui-model-seat@0.2.1` 实测通过，装到的就是 `0.2.1`）；开了 `minimumReleaseAgeStrict` 的 profile 会先弹一次确认。
+- **裸包名不会装到刚发的版本**：`minimumReleaseAge` 会让裸名解析成「满一天的最新版」。实测 2026-10-29T07:26Z 发完 `0.2.1` 之后，`pnpm add dsh-client-ui-model-seat`（以及 `dsh plugin add` 不带版本）装到的是 **`0.1.2`** —— `0.2.0`（前一日 10:37Z）与 `0.2.1` 都还没过闸门。这不是插件 bug；README 里两条安装命令因此写成「写死版本 / 裸包名」并列。判断现场装的是哪版：`node -e "console.log(require('<profile>/node_modules/dsh-client-ui-model-seat/package.json').version)"`。
 
 ### 19.6 渠道对齐（本仓库实际开了几个）
 

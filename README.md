@@ -133,14 +133,21 @@ comes back.
 
 ## Install
 
-    dsh plugin add dsh-client-ui-model-seat                              # from the registry (0.1.2+)
+    dsh plugin add dsh-client-ui-model-seat@0.2.1                        # from the registry (pin it, see below)
+    dsh plugin add dsh-client-ui-model-seat                              # from the registry (bare name)
     dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # from source
     dsh plugin add link:/absolute/path/to/dsh-client-ui-model-seat       # local checkout
 
 Both channels ship the same tree. The npm page is
 [npmjs.com/package/dsh-client-ui-model-seat](https://www.npmjs.com/package/dsh-client-ui-model-seat);
-the first release on it is `0.1.2`. A pnpm profile with `minimumReleaseAge` may
-ask once before accepting a version published in the last day.
+the first release on it is `0.1.2` and the current one is `0.2.1`.
+
+> **A bare name installs an older version.** pnpm 11 gates fresh releases with
+> `minimumReleaseAge` (1440 minutes) by default, so a bare spec resolves to the
+> newest version that is at least a day old — measured on 2026-10-29, right
+> after publishing `0.2.1`, `pnpm add dsh-client-ui-model-seat` installed
+> `0.1.2`. Pin the version (`@0.2.1`) to get it now; pnpm then records it in the
+> profile's `minimumReleaseAgeExclude`.
 
 The plugin bundle inserts one row into the profile (`id: model-seat`) and
 registers its seat at `priority: -2`, so a leftover copy of either original

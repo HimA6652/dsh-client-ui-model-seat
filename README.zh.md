@@ -113,13 +113,16 @@ dsh 输入区的「模型 + 思考强度」控件。它由两个插件合并而�
 
 ## 安装
 
-    dsh plugin add dsh-client-ui-model-seat                              # 从 registry（0.1.2+）
+    dsh plugin add dsh-client-ui-model-seat@0.2.1                        # 从 registry（写死版本，见下）
+    dsh plugin add dsh-client-ui-model-seat                              # 从 registry（裸包名）
     dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # 从源码
     dsh plugin add link:/absolute/path/to/dsh-client-ui-model-seat       # 本地检出
 
 两个通道发布的是同一份文件树。npm 页面是
 [npmjs.com/package/dsh-client-ui-model-seat](https://www.npmjs.com/package/dsh-client-ui-model-seat)，
-首次发布是 `0.1.2`。开了 `minimumReleaseAge` 的 pnpm profile 可能会就「一天内发布的版本」问一次。
+首次发布是 `0.1.2`，当前版本是 `0.2.1`。
+
+> **裸包名会装到旧版本**：pnpm 11 默认有 `minimumReleaseAge`（1440 分钟）的供应链闸门，裸包名会解析成**「满 24 小时的最新版」**而不是 `latest`——实测 2026-10-29 发完 `0.2.1` 之后 `pnpm add dsh-client-ui-model-seat` 装到的是 `0.1.2`。要立刻装到最新，把版本写死（`@0.2.1`，pnpm 会把它记进 profile 的 `minimumReleaseAgeExclude`）；或者等一天再装。
 
 插件的 bundle 只往 profile 里插一行（`id: model-seat`），并以 `priority: -2` 注册它的座位，
 所以残留的任一原插件（`-1`）或内置控件（`0`）会被遮蔽，而不是撞在一起。

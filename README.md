@@ -47,12 +47,14 @@ no credential access, no host module.
 | Model column | Head shows the provider under the pointer; a 30 px search box sits inside the column. Hovering the provider column swaps the models **without moving the card**. |
 | Search | Typing searches **every** provider at once and shows the provider name on each row. The card keeps its two-column shape while typing — a re-shaping card is exactly the resize flicker this plugin removes. |
 | Thinking slider | The particle slider from the shell, over the level ladder of the selected model, with keyboard arrows/Home/End. |
-| Thinking head | The current level on the left — click it to return to the two columns — and a reset button that restores the model's default level. |
+| Thinking head | The current level on the left (click it to return to the two columns), a bolt that jumps to the highest level and back to the one you left, and a reset button that restores the model's default level. |
 | Appearance panel | `Ctrl+Shift+Alt+G`. Colour tokens per side (light/dark), scheme library, JSON import/export, reset, cross-apply to the other side, live preview. |
 
 Geometry: the card is `416 px` wide in the column layout and `300 px` in the
-thinking panel, clamped to the viewport; heights clamp to `132…420 px` and the
-card flips above the trigger when that gives more room.
+thinking panel, both clamped to the viewport. Each layout keeps its own floor —
+eight model rows, i.e. `333 px`, for the columns and `96 px` for the thinking
+panel — so the card never drops below its own body, and both cap at `420 px`.
+The card flips above the trigger when that gives more room.
 
 ## The flicker this merge had to fix
 
@@ -197,9 +199,10 @@ store and the desktop app are never involved.
 Edge over CDP and asserts, in nine sections: the two-column card, a constant
 height while the pointer rests over 60 models, close/reopen determinism, the
 cross-provider query, the empty-query note (one padded `.ms-empty`, zero rows),
-the thinking pane (no bolt control, drift always on, its own height, icon and
-label contrast), the slider keyboard path, the reset button, the retirement of
-the fast-mode key, the head status button returning to the columns, the
+the thinking pane (the bolt, drift always on, its own height, equal top and
+bottom inset, icon and label contrast), the slider keyboard path, the bolt's
+jump to the top level and its return, the eight-row floor under the model
+column, the reset button, the retirement of the fast-mode key, the head status button returning to the columns, the
 colour-panel hotkey, and a clean console. `--shot DIR` writes screenshots;
 `--dump` prints the card box and its children. The e2e loads React from the
 committed `test/vendor/` UMD builds, so a fresh clone needs no external

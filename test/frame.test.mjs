@@ -25,9 +25,14 @@ test('the thinking panel is narrower than the model card', () => {
   assert.equal(frame(anchor(), 'columns', 300).width, 416)
 })
 
-test('a short natural height wins over the cap', () => {
-  assert.equal(frame(anchor(), 'columns', 300).height, 300)
-  assert.equal(frame(anchor(), 'columns', 40).height, 132)
+test('a short natural height is lifted to its own layout floor', () => {
+  // 0.2.1 gave each layout its own floor: eight rows for the model columns
+  // (32 * 8 + 25 + 6.5 + 36 + 8 + 1 = 333) and the panel's own body height (96).
+  // A provider with two models used to leave a stub of a card, and moving the
+  // pointer from it to a provider with sixty re-framed the whole popover.
+  assert.equal(frame(anchor(), 'columns', 300).height, 333)
+  assert.equal(frame(anchor(), 'columns', 40).height, 333)
+  assert.equal(frame(anchor(), 'panel', 40).height, 96)
 })
 
 test('the card flips above a trigger near the top of the window', () => {

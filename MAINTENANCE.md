@@ -1,13 +1,13 @@
 # dsh-client-ui-model-seat 维护手册
 
 > 读者：要改这个插件的人（包括未来的你）。
-> 目标：不读 3217 行也能定位改动点；改完知道为什么没坏。
-> 行号基线：`lib/client.js` 共 3217 行、`BUILD = 0.2.0+merge`。**行号会漂移**，
+> 目标：不读 3601 行也能定位改动点；改完知道为什么没坏。
+> 行号基线：`lib/client.js` 共 3601 行、`BUILD = 0.2.1+merge`。**行号会漂移**，
 > 每一处都同时给了函数名或唯一字符串，以函数名为准、行号为辅。
 
 ## 0. 三十秒上手
 
-- 这是一个**单文件 bundle 插件**：`lib/index.js`（Host 半边，空实现）+ `lib/client.js`（浏览器半边，3217 行，手写，无构建步骤）。
+- 这是一个**单文件 bundle 插件**：`lib/index.js`（Host 半边，空实现）+ `lib/client.js`（浏览器半边，3601 行，手写，无构建步骤）。
 - 它只做一件事：抢占会话输入框里 `conversation.input.model` 这个**槽位**，把 dsh 自带的模型选择器换成"供应商列 + 模型列 + 粒子思考滑块"三合一控件。
 - 它同时是 A（`dsh-client-ui-gpt-helper`：外壳、粒子滑块、配色面板、i18n）和 B（`dsh-model-provider-prefix`：两列卡片骨架）的合并体，两个上游都不能同时装 —— 它们注册同一个槽位、同一优先级，运行时会抛。
 - 唯一必须守住的特性：**卡片尺寸只能由锚点与布局决定，不能由内容决定**。所有看起来"多余"的代码（freeze、floor、scrollbar-gutter、query 不改布局）都是为了这条。
@@ -16,7 +16,7 @@
 
 | 路径 | 作用 | 改动时要动它吗 |
 | --- | --- | --- |
-| `lib/client.js` | 全部前端实现与样式（3217 行） | 是，几乎所有功能改动都在这里 |
+| `lib/client.js` | 全部前端实现与样式（3601 行） | 是，几乎所有功能改动都在这里 |
 | `lib/index.js` | Host 半边；只导出 `name` 与空的 `apply()` | 基本不动（`validate` 禁止 Host 半边碰 DOM） |
 | `cordis.patch.yml` | 往 profile 插一行 `{ id: model-seat, name: dsh-client-ui-model-seat }` | 换插件 id 时才动 |
 | `package.json` | `dsh.client` / `dsh.bundle.patch` / `files` / scripts | 加脚本、改注入目标时动 |
@@ -32,7 +32,7 @@
 | `.github/workflows/ci.yml` | 推到 `main` / 每个 PR / 手动触发：`npm run check` + 真实 Edge 的 `npm run e2e`，截图作为 artifact 留存 | 加检查项或换 runner 时 |
 | `MERGE-PLAN.md` | 合并前的设计文档，**历史档案**；文首"实施结果"一节记录了与设计的偏差 | 不改，只在重大偏差时补一行 |
 | `scripts/validate-plugin.mjs` | 清单/补丁/入口/bundle 加载/apply 的静态+运行时校验（80 项） | 新增入口契约时加检查 |
-| `scripts/doc-anchor-check.mjs` | 校验本文里 `符号`（行号）锚点与区间仍落在 `client.js` 内，并核对"3217 行"这个自称 | 本文改结构或 `client.js` 增删行后会被自动覆盖 |
+| `scripts/doc-anchor-check.mjs` | 校验本文里 `符号`（行号）锚点与区间仍落在 `client.js` 内，并核对"3601 行"这个自称 | 本文改结构或 `client.js` 增删行后会被自动覆盖 |
 | `scripts/css-audit.mjs` | 样式表作用域、死类、border-box、上游属性残留的审计 | 新增 `.ms-` 类时会被自动覆盖 |
 | `scripts/loadcheck.mjs` | 针对本机 dsh checkout 做加载与优先级排序检查（无 checkout 时跳过） | 少动 |
 | `scripts/check-secrets.mjs` | 凭据形状与本机路径扫描（33 个文本文件） | 新增本机相关文档时会被自动覆盖 |
@@ -42,7 +42,7 @@
 | `scripts/shots.mjs` | 生成 `assets/screenshot-*.png`（真实 bundle + demo 数据，2 倍图） | 换皮或加截图时 |
 | `scripts/browser-check.mjs` | 真浏览器 E2E（CDP + headless Edge），9 个段落 | 交互变更时同步 |
 | `scripts/live-check.mjs` | 在**真实 dsh** 页面上跑的断言 | 同上 |
-| `test/*.test.mjs` | 29 个 node:test 用例（frame/i18n/register/rows） | 同上 |
+| `test/*.test.mjs` | 41 个 node:test 用例（frame/i18n/register/rows/bolt） | 同上 |
 | `test/harness/` | fixture 页面：假的槽位注册表 + 假的模型目录 | 需要新 fixture 时动 |
 | `test/vendor/` | React 开发版 UMD（`react.js` 110 KB + `react-dom.js` 1.08 MB，MIT），E2E/live-check 的页面依赖；**插件运行时不使用**（运行时从宿主 `__ModuleLoader__` 取 React） | 只在升级 React 时替换 |
 | `tools/merge/gen-client.mjs` | **历史工具**，从 A 的 bundle 生成初稿；**默认拒绝运行**，`--force` 才覆盖且先写 `lib/client.js.bak-gen-<时间戳>` | 只在考古时读 |
@@ -89,35 +89,38 @@ ModelSeat  useSyncExternalStore(directory) → 读快照 → 渲染触发器 + p
 | 1 | 1–61 | 加载器外壳与常量 | `BUILD`、`NS`、`CONFIG_KEY`、`DEFAULT_HOTKEY` |
 | 2 | 62–270 | 颜色 token 表与规范化 | `COLOR_TOKENS`（62）、`TOKEN_BY_KEY`、`normalizeColors/Sides/Slots`、`tokenValueFor`（243） |
 | 3 | 271–370 | 明暗判定与热键解析 | `THEME_ATTRIBUTE`（271）、`detectSide`（284）、`parseHotkey`、`hotkeyMatches` |
-| 4 | 371–575 | 配置 schema v3 + 迁移 + store | `defaultConfig`（371）、`normalizeConfig`（392）、`configToDocument`（418）、`importSchemes`、`createStore`（505）、`CONFIG_STORE`（530） |
-| 5 | 576–1102 | 生成样式表 | `cssStatements`（576）、`resolveSide`、`buildCss`（613）、`CSS_TEMPLATE`（634 起；内含 `.ms-empty` 空状态规则） |
-| 5b | 1103–1232 | i18n 词典 | `ZH`（1103）、`EN`（1168） |
-| 6 | 1233–1323 | 图标与粒子 | `Caret`（1234）、`ResetIcon`（1253）、`Check`（1272）、`PARTICLES`（1291）、`levelRatios`（1317） |
-| 7 | 1324–2060 | 外观面板与其 hooks | `PANEL_STORE`（1330）、`ConfigPanel`（1360）、`useConfigPanelHotkey`（2033） |
-| 8 | **2061–2116** | **几何引擎（核心）** | `CARD_MIN_HEIGHT`（2069）、`COLUMNS_WIDTH`（2072）、`PANEL_WIDTH`（2073）、`frame`（2083）、`clamp`、`geometryKey`（2113） |
-| 9 | 2117–2192 | 行模型（纯函数） | `groupById`（2117）、`providerLabel`（2126）、`providerRows`（2133）、`modelRows`（2164） |
-| 10 | 2193–2299 | 样式注入与注册 | `STYLE_ID`（2194）、`applyStyleSheet`（2196）、`WarnGlyph`（2209）、`SLOT`（2220）、`registerSeat`（2257） |
-| 11 | **2300–3170** | **`ModelSeat` 组件** | 状态、几何、选择、滑块、渲染（见下表） |
-| 12 | 3171–3217 | 导出半边 | `inject`、`apply`、`__internals`（3204） |
+| 4 | 371–709 | 配置 schema v3 + 迁移 + store + 闪电记忆（含 cookie 镜像与跨会话交接） | `defaultConfig`（371）、`normalizeConfig`（392）、`configToDocument`（418）、`importSchemes`、`createStore`（505）、`CONFIG_STORE`（530）、`BOLT_KEY`（555）、`BOLT_COOKIE`（556）、`BOLT_LAST`（571）、`BOLT_COOKIE_SESSIONS`（577）、`BOLT_COOKIE_BYTES`（578）、`normalizeBoltRecord`（580）、`parseBoltMemory`（593）、`readCookie`（610）、`readBoltMemory`（631）、`writeBoltCookie`（639）、`BOLT_STORE`（657）、`writeBoltMemory`（670） |
+| 5 | 710–1272 | 生成样式表 | `cssStatements`（734）、`resolveSide`、`buildCss`（771）、`CSS_TEMPLATE`（792 起；内含 `.ms-empty` 空状态规则） |
+| 5b | 1273–1410 | i18n 词典 | `ZH`（1273）、`EN`（1342） |
+| 6 | 1411–1523 | 图标与粒子 | `Caret`（1412）、`BOLT_PATH`（1435）、`Bolt`（1437）、`ResetIcon`（1453）、`Check`（1472）、`PARTICLES`（1491）、`levelRatios`（1517） |
+| 7 | 1524–2260 | 外观面板与其 hooks | `PANEL_STORE`（1530）、`ConfigPanel`（1560）、`useConfigPanelHotkey`（2233） |
+| 8 | **2261–2388** | **几何引擎（核心）＋闪电回退与交接** | `CARD_GAP`（2267）、`CARD_TALL`（2269）、`COLUMNS_WIDTH`（2271）、`PANEL_WIDTH`（2272）、`PANEL_MIN_HEIGHT`（2282）、`MODELS_MIN_ROWS`（2286）、`MODELS_ROW_HEIGHT`（2290）、`MODELS_CHROME`（2291）、`MODELS_MIN_HEIGHT`（2292）、`clamp`（2294）、`frame`（2302）、`geometryKey`（2333）、`boltReturnIndex`（2347）、`boltMemoryFor`（2373） |
+| 9 | 2389–2464 | 行模型（纯函数） | `groupById`（2389）、`providerLabel`（2398）、`providerRows`（2405）、`modelRows`（2436） |
+| 10 | 2465–2573 | 样式注入与注册 | `STYLE_ID`（2466）、`applyStyleSheet`（2468）、`WarnGlyph`（2481）、`SLOT`（2492）、`registerSeat`（2529） |
+| 11 | **2574–3553** | **`ModelSeat` 组件** | 状态、几何、选择、滑块、渲染（见下表） |
+| 12 | 3554–3601 | 导出半边 | `inject`、`apply`、`__internals`（3586） |
 
-`ModelSeat` 内部再分 8 块（行号 = 未发布的工作树，`lib/client.js` 3217 行）：
+`ModelSeat` 内部再分 9 块（行号 = 未发布的工作树，`lib/client.js` 3601 行）：
 
 | 块 | 行 | 说明 |
 | --- | --- | --- |
-| hooks 与 store | 2300–2332 | `useSyncExternalStore`（2301）、11 个 `useState`（2305–2318）、8 个 `useRef`（2319–2325）、`useConfigPanelHotkey()`（2327）、配色 store（2328） |
-| 派生数据 | 2333–2414 | `groups/current/pending/busy/disabled`、`layout`（2345）、`choices`、`currentChoice`、`reasoning/efforts/effectiveEffort`、`levels`、`ratios`、`levelIndex`、`displayIndex`、`displayLabel`、`modelLabel`、`isUltra`、`shownRatio` |
-| 开关与关闭 | 2415–2468 | `close`（2416）、`toggleCard`（2432）、外部 pointerdown 与 Escape（2449–2467） |
-| 几何 ①锚点 | 2469–2515 | 量触发器盒（2474 起）、监听 resize/滚动、`setRect`（只在盒变化时）、`frameKey`（2505）、`anchorKey`（2508） |
-| 几何 ②冻结 | 2516–2580 | `measure()`（2519）、按本布局宽度量（先写 `card.style.width` 再量，2526–2539）、`carry`（2548）、`frame`（2550）、`document.fonts.ready` 复量（2574）、依赖数组（2580） |
-| 样式表重建 | 2582–2585 | 配置变化 → 重新 `buildCss` → `applyStyleSheet`（2584） |
-| 选择与滑块 | 2591–2803 | `submit`（2596）、`showQuota`、`applyLevel`、`chooseModel`（2630）、`reset`（2647）、`ratioFromClientX`（2672）、`nearestIndex`（2683）、`snapBack`（2696）、`beginDrag`（2715）、`finishDrag`（2734）、`cancelDrag`（2754）、`onSliderKey`（2788） |
-| 渲染 | 2804–3170 | `triggerTitle`（2809）、`triggers`（2822）、`menu`（2869）、两列、思考面板、portal（3128）、根节点（3156） |
+| hooks 与 store | 2574–2607 | `useSyncExternalStore`（2575）、11 个 `useState`（2579–2592）、7 个 `useRef`（2594–2600）、`useConfigPanelHotkey`（2602）、配色 store（2603） |
+| 派生数据 | 2608–2742 | `groups`（2608）、`current`（2609）、`pending`（2610）、`busy`（2611）、`disabled`（2614）、`layout`（2620）、`choices`（2622）、`currentChoice`、`reasoning`/`efforts`/`effectiveEffort`、`levels`、`ratios`、`levelIndex`、`displayIndex`、`displayLabel`、`modelLabel`（2668）、`isUltra`（2676）、闪电记忆 `boltMemory`（2683）、`hasBolt`（2689）、`atTop`（2690）、跨会话交接 `boltBack`（2693）/`boltBackFromMemory`（2711）、**`boltOn = hasBolt && boltBack !== null`（2706，0.2.2 起在顶档但没记忆不算开）**、`boltIdleAtTop`（2709）、`boltBackIndex`（2710）、`boltTitle`（2713）、换模型清记忆（2719–2728）、`shownRatio`（2730） |
+| 开关与关闭 | 2743–2800 | `close`（2743）、`toggleCard`（2759）、外部 pointerdown 与 Escape |
+| 几何 ①锚点 | 2801–2831 | 量触发器盒、监听 resize/滚动、`setRect`（只在盒变化时）、`place`（2801） |
+| 几何 ②冻结 | 2832–2922 | `frameKey`（2832）、`anchorKey`（2835）、`measure`（2846）、按本布局宽度量（先写 `card.style.width` 再量）、`carry`（2875）、`frame()`、`document.fonts.ready` 复量 |
+| 选择提交 | 2923–2963 | `submit`（2923）、`showQuota`（2932）、`applyLevel`（2941）：除闪电以外的任何改档都会清掉闪电记忆 |
+| 闪电 | 2964–3031 | `toggleBolt`（2964）把按下前的 effort 记进会话存储并跳到最高档，再按回到那一档；`boltIdleAtTop` 时直接 return（不发明记忆），回退分支带 `dropLast` 退役跨会话镜像；`chooseModel`（2988）、`reset`（3006）紧接其后，同样清记忆 |
+| 滑块指针 | 3032–3168 | `ratioFromClientX`（3032）、`nearestIndex`（3043）、`snapBack`（3056）、`beginDrag`（3075）、`finishDrag`（3094）、`cancelDrag`（3114）、`onSliderKey`（3148） |
+| 渲染 | 3169–3553 | `triggerTitle`（3169）、`triggerProvider`（3175）、`triggers`（3182）、两列、思考面板 head（`data-quota` / `data-bolt`，3385–3386）、`effort-bolt`（3394，`disabled: sliderDisabled || boltIdleAtTop` 在 3398）、`effort-reset`（3425）、portal（3510）、根节点（3546） |
 
 参数化的纯函数（`__internals` 暴露，测试直接用）：
 
 - `frame(anchor, layout, naturalHeight, floorHeight) -> { left, bottom, width, height, flipped }`
 - `geometryKey(layout, status, levelCount) -> string`
 - `providerRows(state, currentProvider) -> Row[]`、`modelRows(group, query, current) -> Row[]`
+- `boltReturnIndex(levels, memory, defaultEffort) -> number`：闪电要回到的档位下标 —— 先按 effort id 认记忆里的那一档，其次是模型默认（默认就是顶档则跳过），再其次是顶档下一档；`-1` 表示无处可回
+- `boltMemoryFor(records, sessionKey, provider, model, atTop) -> record | null`：本会话的记录优先；本会话没有时，只有在**已经处于顶档**才借上一次启动留下的 `last` 交接记录，且必须同 provider/model
 - `groupById(groups, id)`、`providerLabel(state, id)`
 
 ## 4. 必须守住的 10 条不变量
@@ -143,12 +146,13 @@ ModelSeat  useSyncExternalStore(directory) → 读快照 → 渲染触发器 + p
 
 ```js
 width  = clamp(layout === "columns" ? 416 : 300, 0, innerWidth  - 24)
-wanted = min(max(natural, floor), 420)          // 132 是下限
+wanted = min(max(natural, floor), 420)          // floor = 冻结的既有高度，缺省 0
 above  = anchor.top    - 8                      // CARD_GAP
 below  = innerHeight - anchor.bottom - 8
 flipped = above < wanted && below > above
 room    = flipped ? below : above
-height  = max(132, min(wanted, room))
+floor2 = layout === "columns" ? 333 : 96        // 两套下限（0.2.1 起）
+height = max(floor2, min(wanted, room))
 left    = clamp(anchor.left, 12, innerWidth - width - 12)
 bottom  = flipped ? innerHeight - anchor.top + 8 : innerHeight - anchor.bottom - 8
 ```
@@ -160,9 +164,9 @@ bottom  = flipped ? innerHeight - anchor.top + 8 : innerHeight - anchor.bottom -
 ```
 open/pane/anchor/status 变化
    │
-   ├─ ① 锚点段（2852–2894）：读触发器 getBoundingClientRect → setRect（只有盒真的变了才 set）
+   ├─ ① 锚点段（2796–2830）：读触发器 getBoundingClientRect → setRect（只有盒真的变了才 set）
    │
-   ├─ ② 冻结段（2895–2960）：card.style.width 先定成本布局宽度；card.style.height = "auto"; maxHeight = "none"
+   ├─ ② 冻结段（2832–2922）：card.style.width 先定成本布局宽度；card.style.height = "auto"; maxHeight = "none"
    │        natural = card.offsetHeight      ← 用 offsetHeight 而不是 rect.height
    │        因为入场动画有 transform: scale()，rect 会被缩放
    │        恢复原 height/maxHeight；setFrozen(frame(rect, layout, natural, floor))
@@ -263,10 +267,10 @@ modelLabel = 名称 ?? "provider/model" ?? loading/fallback 文案
 | --- | --- | --- |
 | 点模型行 | `select({ provider, model, reasoningEffort })`，`reasoningEffort` 取该模型的 `defaultEffort`（若就是当前模型则沿用当前值） | 成功才关 |
 | 拖动/键盘改等级 | `applyLevel(index)` → `select({ provider: current.provider, model: current.model, reasoningEffort })` | 不关 |
-| 复位按钮 | 选回 `defaultEffort ?? efforts[0].id`（`reset`，2647） | 不关 |
+| 复位按钮 | 选回 `defaultEffort ?? efforts[0].id`（`reset`，2984） | 不关 |
 | retry 行 | `load()` 重新拉取该供应商 | 不关 |
 
-`submit()`（2962）只关心 `result === undefined || result.ok === true` 才算成功；失败时卡片**保持打开**，错误由宿主的 `error` 字段渲染出来。这是刻意的：关掉卡片会藏起失败原因。
+`submit()`（2904）只关心 `result === undefined || result.ok === true` 才算成功；失败时卡片**保持打开**，错误由宿主的 `error` 字段渲染出来。这是刻意的：关掉卡片会藏起失败原因。
 
 ## 8. 交互状态机
 
@@ -352,11 +356,15 @@ modelLabel = 名称 ?? "provider/model" ?? loading/fallback 文案
 
 **不读上游存储键**（`dsh-client-ui-gpt-helper:config:v1`）：schema 变了，静默半迁移比回默认值更糟。`validate` 里有检查专门防止上游键复活。
 
-### 9.4 快速档动效（恒开）
+### 9.4 快速档动效（恒开）与闪电按钮
 
 滑轨的粒子漂移是**常开**的：`.gptm-trail` 的基础 `opacity` 就是 `1`，粒子的 `--spin` 直接写 `1`（旧的 fast on 值），没有开关、没有长按锁，也没有持久化键。
 
-- 0.1.3 及以前是 `FAST_STORE`（`dsh-client-ui-model-seat:fast:v1`，形状 `{ fast, locked }`）+ 600 ms 长按锁（`useLongPress`、`LONG_PRESS_MS`）。这条链路连同 bolt 图标、`LockMark`、`LockIcon`、`fast.label` / `fast.locked` 词条与 `.gptm-fastToggle` 一组规则，在未发布的工作树里一次删净（§18 第 10 条）。
+- 0.2.1 把闪电**以新语义**恢复：它不是 fast 模式的开关，而是思考档位的跳顶按钮（`toggleBolt`，2945）。按下记住当前档的 effort id 并跳到最高档；再按按 effort id 找回原档（列表重建过就退回记忆里的下标）。任何其它途径改档 —— 滑块、方向键、复位、换模型 —— 都会清掉记忆（`applyLevel` 的 `keepBolt` 选项、`chooseModel`、`reset`、监听 `current?.provider` / `current?.model` 的效果）。
+- 只有 `levels.length > 1` 才渲染闪电（`hasBolt`，2677）：单档模型没有“更高”可跳，head 收掉那一列而不是显示一个死按钮（`data-bolt="false"` 时网格回到 `1fr 34px`）。
+- 重启之后是**新会话**（宿主每次启动都新开一个 session id，实测 `session-e3f3e1b1` → `session-44268fb2`），按会话分桶的记忆在那里查不到，所以 `writeBoltMemory` 额外写一个保留桶 `last`（`BOLT_LAST`）：`boltMemoryFor` 先查本会话，查不到且**已经在顶档**（`atTop`）才借 `last`，并且必须同 provider/model；桶满裁剪时 `last` 永不淘汰（`filter((key) => key !== BOLT_LAST)`）。
+- 跳顶走 `announceTop: true`，和滑块拖到顶一样弹 1.35 s 的「更快消耗使用额度」横幅；横幅期间 head 的三个按钮 `opacity: 0` + `pointer-events: none`（`.gptm-head[data-quota="true"] .gptm-iconBtn`），所以第二次点击要等横幅消失。这个取舍与复位按钮早就存在的行为一致，不是新增。
+- 0.1.3 及以前是 `FAST_STORE`（`dsh-client-ui-model-seat:fast:v1`，形状 `{ fast, locked }`）+ 600 ms 长按锁（`useLongPress`、`LONG_PRESS_MS`）。那条链路连同 `.gptm-fastToggle`、`LockMark`、`LockIcon`、`fast.label` / `fast.locked` 词条与 `data-fast` / `data-locked` / `data-tremble` 在 0.1.3 一次删净，0.2.1 没有把它带回来（§18 第 10、11 条）。
 - 旧键既不读也不写，也不主动清理：用户回滚到 0.1.2 时锁定态还在。`validate` 的 `no fast-mode store` 守着它不复活。
 - 再想要开关：先读第 4 节不变量 1/5 —— 开关会改内容高度，必须走 `frameKey`。
 
@@ -391,18 +399,19 @@ npm run check:all   # 两者
 
 | 脚本 | 数量 | 守的东西 | 失败时先看 |
 | --- | --- | --- | --- |
-| `check-secrets.mjs` | 33 个文件 | 凭据形状（GitHub/OpenAI/AWS token、私钥、npm authToken）与本机路径（Windows 用户目录、POSIX home、局域网 IP）；占位符白名单避免误报；行尾 `secret-ok` 可豁免 | 打印的文件:行号 |
+| `check-secrets.mjs` | 34 个文件 | 凭据形状（GitHub/OpenAI/AWS token、私钥、npm authToken）与本机路径（Windows 用户目录、POSIX home、局域网 IP）；占位符白名单避免误报；行尾 `secret-ok` 可豁免 | 打印的文件:行号 |
 | `check-pack.mjs` | 4 条断言 | `files` 无目录项、制品无备份/日志、`files` 全在、制品无清单外文件 | 打印的第一条 `✖` |
-| `validate-plugin.mjs` | 80 项 | 清单字段、`files`、`exports`、补丁行 id/name、入口 `name`/`apply`、Host 半边不碰 DOM、只有一次 `__ModuleLoader__.load`、`apply` 是真函数、`__internals` 齐全、`BUILD` 存在且含版本、无上游模块 id/上游存储键、无 `data-dsh-pm-`、无 `data-gpt-helper`、8 个 `data-model-seat` 值齐全、座位键存在、只注册一次、槽位名、优先级 `-2`、locale 命名空间、按会话 inject、边界组件、词典注册、中英双语、只有一个 `<style>`、样式 id、样式体量、`frame` 契约、卡片规则、槽位动画保留、样式复用、head 里只有一张表、可发布（没有 `private`）、license/author/repository 齐全、商店资产（图标存在、`screenshots.json` 可解析且 1-8 条相对路径都存在） | 打印的第一条 `✖` |
-| `doc-anchor-check.mjs` | 63 符号 / 28 区间 | 本文每个 `符号`（行号）都还能在 `client.js` 的 3217 行里找到同名符号、区间不越界不倒序；顺带核对文首"3217 行"与 `BUILD` 版本号 | 打印的第一个越界锚点（`MAINTENANCE.md:行号 符号 不在 client.js:行号`） |
-| `css-audit.mjs` | 200 规则 / 212 选择器 | `<style>` 注入、括号平衡、无 `!important`、无未解析颜色标记、无模板占位符、无上游属性选择器、选择器数 > 60、无裸 `.ms-`、每条规则挂在控件根下、每个渲染出的 `.ms-` 类都有规则、卡片是 border-box；死规则只 warn | `css-audit:` 汇总行 + 上一条 `✖` |
+| `validate-plugin.mjs` | 103 项 | 清单字段、`files`、`exports`、补丁行 id/name、入口 `name`/`apply`、Host 半边不碰 DOM、只有一次 `__ModuleLoader__.load`、`apply` 是真函数、`__internals` 齐全、`BUILD` 存在且含版本、无上游模块 id/上游存储键、无 `data-dsh-pm-`、无 `data-gpt-helper`、8 个 `data-model-seat` 值齐全（含 `effort-bolt` / `effort-reset`）、无锁绘制（`no lock drawing`）、闪电九件套（绘制 `bolt drawing present`、双档位 `bolt needs two levels`、跳顶 `bolt jumps to the top level`、按 effort id 记与回 `bolt remembers its level` / `bolt restores by effort id`、按会话持久化 `bolt memory is per session` / `bolt memory survives a restart` / `bolt memory belongs to one model`、在顶档不算按下三件套（`the bolt only lights from a memory` / `the bolt is inert at the top` / `turning the bolt off retires the hand-over`）、记忆的 cookie 镜像 `bolt memory mirrors into a cookie` / `the cookie mirror is host-scoped` / `the cookie mirror is read when storage is gone` / `bolt outlives its conversation` / `the hand-over only speaks at the top` / `the hand-over is never aged out`）、座位键存在、只注册一次、槽位名、优先级 `-2`、locale 命名空间、按会话 inject、边界组件、词典注册、中英双语、只有一个 `<style>`、样式 id、样式体量、`frame` 契约（`per-layout frame floor`）、卡片规则（含 `eight-row model floor`）、槽位动画保留、样式复用、head 里只有一张表、可发布（没有 `private`）、license/author/repository 齐全、商店资产（图标存在、`screenshots.json` 可解析且 1-8 条相对路径都存在） | 打印的第一条 `✖` |
+| `doc-anchor-check.mjs` | 107 符号 / 29 区间 | 本文每个 `符号`（行号）都还能在 `client.js` 的 3601 行里找到同名符号、区间不越界不倒序；顺带核对文首"3601 行"与 `BUILD` 版本号 | 打印的第一个越界锚点（`MAINTENANCE.md:行号 符号 不在 client.js:行号`） |
+| `css-audit.mjs` | 182 规则 / 192 选择器 | `<style>` 注入、括号平衡、无 `!important`、无未解析颜色标记、无模板占位符、无上游属性选择器、选择器数 > 60、无裸 `.ms-`、每条规则挂在控件根下、每个渲染出的 `.ms-` 类都有规则、卡片是 border-box；死规则只 warn | `css-audit:` 汇总行 + 上一条 `✖` |
 | `loadcheck.mjs` | 6 项 | 注入目标存在、槽位在加载的前端里声明、注册表按优先级排序、入口名与包名一致、`apply` 导出、补丁行 id 是新的、补丁只插一行；**没有 dsh checkout 时整体跳过**（不算失败） | `skipped` 说明 |
-| `test/frame.test.mjs` | 10 | `frame()` 纯函数语义：列宽、面板更窄、自然高度优先、上下翻转、锚点底边、无空间时不翻、视口夹取、封顶后与自然高度无关、`geometryKey` 只随三要素变、地板语义 | 对应用例名 |
+| `test/frame.test.mjs` | 10 | `frame()` 纯函数语义：列宽、面板更窄、短内容被本布局的下限抬起（列 333 / 面板 96）、上下翻转、锚点底边、无空间时不翻、视口夹取、封顶后与自然高度无关、`geometryKey` 只随三要素变、冻结高度只增不减 | 对应用例名 |
 | `test/i18n.test.mjs` | 6 | 见第 10 节 | 对应用例名 |
 | `test/register.test.mjs` | 6 | 注册恰好一次且 `-2`、每会话一个目录、子代理隐藏、`<style>` 只进 head 一次、没有直连服务时走 `ctx.inject`、没有 effect runner 也能注册词典、错误边界回落 | 对应用例名 |
 | `test/rows.test.mjs` | 7 | `groupById` 容错、`providerLabel` 回显未知 id、供应商行 + retry 行、空状态、retry 行无 id 时按位置兜底、模型行标记当前项 + 大小写无关过滤、缺 group/缺名字 | 对应用例名 |
-| `browser-check.mjs` | 报告分组 | `shape` 两列卡片（宽度/内边距/搜索框在模型列/触发器整段 `provider/model` 无空格且斜杠与 provider 间距 ≤1.5px）、`still` 指针静置 60 个模型 900 ms 高度不变、`swapped` 悬停换列不位移、`reopened` 关→开可复现、`filtered` 查询跨供应商且布局不变、`selections` 思考面板滑块/键盘/没有闪电控件/动效常开/复位按钮与选中后改名、`fast` 配色热键与状态按钮，外加控制台无错误 | 报告里 `problems[]` 与 `shape`/`still`/`filtered` |
-| `live-check.mjs` | 视页面而定 | 真实 dsh 页面上：样式只注入一次、触发器形如 `provider/model`、卡片能开、两列、显示前已量好（`data-ready`）、内联高度冻结、900 ms 内只有一个高度、思考面板无搜索框、Escape 关闭；`--publish` 额外点一个模型并断言触发器改名 | `problems[]` / `consoleErrors[]` |
+| `test/bolt.test.mjs` | 12 | `boltReturnIndex`：记忆里的 effort id 命中、id 已消失时退回模型默认、模型默认就是顶档时再退一档、供应商默认档（`effort` 为 `undefined`）、下面已无档位返回 `-1`、空 `levels` 返回 `-1`；`boltMemoryFor` 的交接语义：本会话的记录优先于 `last` 镜像、新会话在顶档时继承镜像、没到顶档时镜像沉默、镜像只对同一个 provider/model 说话、清掉本会话记录不影响下一次启动、一条记录都没有时返回 `null` | 对应用例名 |
+| `browser-check.mjs` | 报告分组 | `shape` 两列卡片（宽度/内边距/搜索框在模型列/触发器整段 `provider/model` 无空格且斜杠与 provider 间距 ≤1.5px）、`still` 指针静置 60 个模型 900 ms 高度不变、`swapped` 悬停换列不位移、`reopened` 关→开可复现、`filtered` 查询跨供应商且布局不变、`selections` 思考面板滑块/键盘/闪电三态（未按 → 跳顶 → 回原档，手动改档即失效）/动效常开/复位按钮与选中后改名、`pane.inset` 顶底内缩相等、`shortCard` 八行下限 333 且列内滚动、`fast` 配色热键与状态按钮、`bolt` 的重载（7b）与**换 origin 重启**（7c：第二个 HTTP 服务器、`localStorage` 读回必须为 `null`、灯与「回到哪一档」仍要对）、**新会话交接**（7d：同一浏览器 profile、`?session=session-9` 的新页面，`localStorage` 仍为空，灯与回退档位由 `last` 桶给出、提交次数为 0）、`restart` 段记录新 origin 与读到的存储、`motion` 段记录减少动效前后的漂移，外加控制台无错误 | 报告里 `problems[]` 与 `shape`/`still`/`filtered` |
+| `live-check.mjs` | 视页面而定 | 真实 dsh 页面上：样式只注入一次、触发器形如 `provider/model`、卡片能开、两列、显示前已量好（`data-ready`）、内联高度冻结、900 ms 内只有一个高度、思考面板无搜索框、Escape 关闭、闪电存在且未按下（只读，不点）、思考面板顶底内缩相等、闪电与复位按钮对比度 ≥ 4.5；`--publish` 额外点一个模型并断言触发器改名 | `problems[]` / `consoleErrors[]` |
 
 ### 11.3 fixture 的可调旋钮
 
@@ -497,7 +506,7 @@ npm run live -- --url "http://127.0.0.1:6124/?token=…"
 ### 14.1 改卡片宽度
 
 1. `.ms-col[data-col="providers"]` 的 `flex-basis` 或模型列同项；
-2. `COLUMNS_WIDTH`（2072 行）改成新合计；
+2. `COLUMNS_WIDTH`（2271 行）改成新合计；
 3. `test/frame.test.mjs` 里的 `416` 期望值；
 4. `npm run check && npm run e2e`，看 `shape.width`。
 
@@ -548,7 +557,7 @@ npm run live -- --url "http://127.0.0.1:6124/?token=…"
 | 搜索框 | 卡片顶部独立搜索行（30px，无边框） | 模型列内（有边框，且仅当该供应商 > 6 个模型才渲染） | **B 的位置 + 有边框**，但**始终显示**且**跨供应商** |
 | 返回箭头 | 有（40px 头部行） | 无 | **删除**；用思考触发器和 `.gptm-status` 双向切换 |
 | 思考滑块 | 粒子滑块 + 42 粒子 | 无 | 保留 A |
-| 快速档动效 | 600 ms 长按锁的开关 | 无 | **恒开**：开关、长按锁、`…:fast:v1` 与 bolt 图标在未发布的工作树里一次删净 |
+| 快速档动效 | 600 ms 长按锁的开关 | 无 | **恒开**：开关、长按锁、`…:fast:v1` 在 0.1.3 删净；闪电在 0.2.1 以「跳最高思考档 / 回原档」的身份回来，不再是快速开关（§9.4） |
 | 配色面板 | token 表 + 方案库 + JSON 导入导出 | 无 | 保留 A |
 | 错误重试行 | 无 | 有 | 保留 B（`providerRows` 里的 `retry` 行） |
 | 尺寸策略 | 内容驱动 | 内容驱动（闪动源） | **帧驱动**：`frame` + 冻结 + 列内滚动 |
@@ -559,7 +568,7 @@ npm run live -- --url "http://127.0.0.1:6124/?token=…"
 
 ## 16. 已知风险与硬约束
 
-1. **`tools/merge/gen-client.mjs` 会覆盖手写文件**。它是初稿生成器（从 `A` 的 3083 行 bundle 逐段打补丁），跑一次就会把 3217 行的合并体换成只有 A 的旧版本。现已加门禁：不带 `--force` 直接 `exit 1` 并打印原因；带 `--force` 也会先写 `lib/client.js.bak-gen-<时间戳>` 备份。保留原因：里面记录了当年 A 的锚点。
+1. **`tools/merge/gen-client.mjs` 会覆盖手写文件**。它是初稿生成器（从 `A` 的 3083 行 bundle 逐段打补丁），跑一次就会把 3601 行的合并体换成只有 A 的旧版本。现已加门禁：不带 `--force` 直接 `exit 1` 并打印原因；带 `--force` 也会先写 `lib/client.js.bak-gen-<时间戳>` 备份。保留原因：里面记录了当年 A 的锚点。
 2. **E2E 的 React vendor 已收进仓库** `test/vendor/`（开发版 UMD，MIT）。`scripts/browser-check.mjs` 与 `scripts/shots.mjs` 默认读它，`--vendor DIR` / `REACT_VENDOR` 仍可覆盖。
 3. **桌面 profile 不可用普通 CLI 改**：`bin.js` 的 `rejectElectronProfile` 会抛 `profile "desktop" is managed exclusively by the Electron application`；必须走 `@deepseek-ai/dsh-desktop-host/lib/cli.js` 的 `runCli({ manageDesktopProfile: true, … })`。
 4. **`0.5px` 在各 dpr 下不等宽**（dpr=1 时 1 设备像素），视觉可接受，不要用 JS 去"修正"。
@@ -573,7 +582,7 @@ npm run live -- --url "http://127.0.0.1:6124/?token=…"
 ### 17.1 装（web / 普通 profile）
 
 ```bash
-# 从 npm（0.1.2 起；实测 2.7 s，零依赖）
+# 从 npm（0.1.2 起；0.2.1 实测 2.7 s，零依赖）
 node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add dsh-client-ui-model-seat
 
 # 从公开仓库（同样实测可装）
@@ -583,7 +592,7 @@ node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add git
 node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add link:/path/to/dsh-client-ui-model-seat
 ```
 
-npm 通道自 `0.1.2` 起开通（`npm view dsh-client-ui-model-seat version` → `0.1.2`，maintainer `hima6652`）。首次发布时 registry 会顺手建一个 `0.0.0-stage` 占位版本，已用 `npm deprecate` 标注说明，装版不会选中它。
+npm 通道自 `0.1.2` 起开通（现为 `0.2.1`：`npm view dsh-client-ui-model-seat version` → `0.2.1`，maintainer `hima6652`）。首次发布时 registry 会顺手建一个 `0.0.0-stage` 占位版本，已用 `npm deprecate` 标注说明，装版不会选中它。
 
 ### 17.2 装（desktop profile）
 
@@ -630,12 +639,15 @@ node seat-desktop-cli.mjs plugin --profile desktop remove dsh-client-ui-model-se
 
 9. ~~思考面板底部的长按提示行~~ —— 0.1.3 删除。`fast.lockHint`（“长按闪电锁定／解锁快速模式”）原本占三个出口：面板底部的一行 `.gptm-hint`、快速开关按钮的 `title`、状态按钮锁定态的 `title`。三处连同中英词条与 `.gptm-hint` 规则一起删掉，长按行为本身保留（`useLongPress`、`LONG_PRESS_MS`，e2e 仍在验“按住锁上 / 再按住解开”）。删后 `lib/client.js` 从 3642 行落到 3634 行；随后 0.1.3 的两条修复（token 注释 +2、`measure()` +15）把它推到 **3651 行**，§3 两张行号表与全文锚点/区间按这个基线重算（`doc-anchor-check` 63 符号 / 28 区间全过）。`browser-check` 第 5 段新增断言：思考面板里 `.gptm-hint` 数量为 0。
 
-10. ~~快速模式的开关、长按锁与持久化键~~ —— 未发布的工作树删除。要求的原话是「删掉闪电符号，把动效固定为开」，实际删掉的比一个图标多：触发器上的 `.gptm-triggerBolt`、思考面板头部的 `.gptm-fastToggle`、`Bolt` / `LockMark` / `LockIcon` 三个绘制函数、`FAST_STORE`（`…:fast:v1`）、`readFast` / `rearmFastFromStorage` / `useFastLock` / `useLongPress`、focus 与 pointerdown 两个重读监听、`tremble` 怠速态与 `@keyframes gptm-tremble`、`data-fast` / `data-locked` / `data-tremble` 三种状态属性、`fast.label` / `fast.locked` 词条，以及 `trigger.bolt` / `trigger.lockMark` / `menu.boltLit` / `slider.particleIdle` / `slider.particleIdleGlow` 五个颜色 token（`menu.bolt` 留着：复位按钮还在用）。滑轨改为 `--spin: 1`、`.gptm-trail` 的 `opacity: 1`；面板头部网格从 `34px 1fr 34px` 收成 `1fr 34px`。`lib/client.js` 从 3651 行落到 **3217 行**；`css-audit` 200 / 212 → **173 / 183**；`validate` 80 → **82** 项（新增 `no fast-mode store` / `no fast-mode switch` / `no bolt or lock drawing`）；`browser-check` 新增「思考面板里没有 bolt 控件」「轨道常亮」「42 个粒子以 `gptm-drift` 跑且 `--spin=1`」三条断言，原本验长按锁的两段换成验复位按钮；`live-check` 同步。§3 两张行号表与全文锚点/区间按这个基线重算。
+10. ~~快速模式的开关、长按锁与持久化键~~ —— 未发布的工作树删除。要求的原话是「删掉闪电符号，把动效固定为开」，实际删掉的比一个图标多：触发器上的 `.gptm-triggerBolt`、思考面板头部的 `.gptm-fastToggle`、`Bolt` / `LockMark` / `LockIcon` 三个绘制函数、`FAST_STORE`（`…:fast:v1`）、`readFast` / `rearmFastFromStorage` / `useFastLock` / `useLongPress`、focus 与 pointerdown 两个重读监听、`tremble` 怠速态与 `@keyframes gptm-tremble`、`data-fast` / `data-locked` / `data-tremble` 三种状态属性、`fast.label` / `fast.locked` 词条，以及 `trigger.bolt` / `trigger.lockMark` / `menu.boltLit` / `slider.particleIdle` / `slider.particleIdleGlow` 五个颜色 token（`menu.bolt` 留着：复位按钮还在用）。滑轨改为 `--spin: 1`、`.gptm-trail` 的 `opacity: 1`；面板头部网格从 `34px 1fr 34px` 收成 `1fr 34px`。`lib/client.js` 从 3651 行落到 **3335 行**；`css-audit` 200 / 212 → **173 / 183**；`validate` 80 → **82** 项（新增 `no fast-mode store` / `no fast-mode switch` / `no bolt or lock drawing`）；`browser-check` 新增「思考面板里没有 bolt 控件」「轨道常亮」「42 个粒子以 `gptm-drift` 跑且 `--spin=1`」三条断言，原本验长按锁的两段换成验复位按钮；`live-check` 同步。§3 两张行号表与全文锚点/区间按这个基线重算。
 
+11. ``闪电以新语义回归、思考面板高度、模型列八行下限`` —— 0.2.1。①闪电点击跳到最高思考档、再点回到开启前的档位（按 effort id 记忆；滑块、方向键、复位、换模型都会清记忆）。②思考面板底部 31px 空白：旧代码只有一个下限 `CARD_MIN_HEIGHT = 132`，而面板自然高只有 101，多出的 31px 全落在滑块下方；改成每布局一套下限（`PANEL_MIN_HEIGHT` 96 / `MODELS_MIN_HEIGHT` 333），`.gptm-menu` 的 padding 从 `9px 11px 12px` 收成 `12px 11px` —— 实测面板 300×101，首个与末个子元素到边框各 13px。③模型卡高度下限 8 行：32×8 + 表头 25 + 线 6.5 + 搜索 36 + 内边距 8 + 边框 1 = 333，指针在 2 个模型的供应商与 60 个模型的供应商之间移动时卡片不再重排。`validate` 82 → **91** 项；`css-audit` 现为 **182 / 192**；`browser-check` 第 5 段扩成闪电循环（12 条断言）+ 新增 6b 段（八行下限）；`live-check` 只读地验闪电存在且未按下、顶底内缩相等、对比度 ≥ 4.5。`lib/client.js` 从 3217 行增到 **3335 行**。④闪电的开启态跨重启丢失（用户 2026-10-29 报「某一个对话我开启闪电按钮，退出 dsh 重新打开之后没有被延续」）：`boltPrev` 原本只是组件 state，而会话已经把顶档的 `reasoningEffort` 恢复回来了，于是重启后按钮看着是灭的、按下去反而把顶档记成「上一档」，成了死键。改法是把记忆持久化到 `dsh-client-ui-model-seat:bolt:v1`（按会话 id 分桶、最多 64 个会话、带 provider/model 归属校验），并把「已经处于顶档」也算作开启态（`atTop`）；回退档位抽成纯函数 `boltReturnIndex`（记忆 id → 模型默认 → 顶档下一档 → `-1`），滑块、方向键、复位、换模型只要有真实改档就清记忆。`validate` 91 → **95** 项（新增四条持久化检查），`npm test` 29 → **35**（新增 `test/bolt.test.mjs` 6 条），`lib/client.js` 3335 → **3579 行**，§3 两张表与全文锚点/区间按这个基线重算。⑤ 跨 origin 的重启才算真重启（同一天二次排查）：dsh 每次启动都以 `--port 0` 起 UI 服务（实测 3091 → 3092），而 `localStorage` 按 host **和端口** 分桶（同一浏览器同一 host 实测 5511 → 5512 读到 `null`，cookie 仍读得回），所以④里那份记忆在真重启后读不到 —— 灯还亮是因为宿主端把 `reasoningEffort` 写进了 `storages/session_projcache/sessions/session-<id>.json`（`record.rows.modelSelection.val.pending.reasoningEffort`），但「按下去回到哪一档」会退化成「回到默认」。现在 `writeBoltMemory` 同时写一份 cookie `dsh-model-seat-bolt`（host 作用域、`path=/`、一年、`SameSite=Lax`；最多 8 个会话 / 3500 字节，超了裁最旧的），`readBoltMemory` 先读 `localStorage`、空了再读 cookie；刻意**不做**「挂载时把档位拉回最高」的补偿，那会覆盖用户在原生 UI 里手动改的档。`browser-check` 新增 7c 段：第二个 HTTP 服务器占另一个端口，`Page.navigate` 过去后先断言 origin 真的变了、`localStorage` 读回 `null`，再断言灯仍亮、`title` 仍是「回到开启前的思考强度」、按一下回到 medium 且提交次数为 0（读回而不是重写）。夹具的档位持久化也从 `localStorage` 换成 cookie（`harness-effort`），否则夹具会在换 origin 时自己丢档位，把正确行为测成 bug。`validate` 95 → **98** 项（cookie 镜像三件套）。⑥ 跨会话交接（同一天第三次排查）：宿主每次启动都新开一个会话，而记忆按会话分桶，于是重启后的新会话查不到上一会话的记录 —— 灯因为 `atTop` 还亮着，回退档位却退化成「回到默认」。`writeBoltMemory` 现在额外写保留桶 `last`（`BOLT_LAST`），`boltMemoryFor(records, sessionKey, provider, model, atTop)` 先查本会话、查不到且已经在顶档才借 `last`（同 provider/model 才认），裁剪时 `last` 永不淘汰；`browser-check` 新增 7d 段（同一浏览器 profile 导航到 `?session=session-9` 的新会话，`localStorage` 仍为空、灯与回退档位由 `last` 给出、提交次数 0）。`validate` 98 → **101** 项（`bolt outlives its conversation` / `the hand-over only speaks at the top` / `the hand-over is never aged out`），`npm test` 35 → **41**（`test/bolt.test.mjs` 6 → 12），行数仍是 3579。
+
+   ⑦ **「闪电默认是开着的」**（同一天第四次排查，0.2.1 发出前）。现象：用户打开思考面板就看见闪电是亮的，但他从没按过。真机取证（克隆 desktop profile 起一份独立副本，`%TEMP%/seat-bolt-home` / profile `deskcheck-bolt` / 端口 6141）：`dsh-client-ui-model-seat:bolt:v1` 读回 `null`、cookie `dsh-model-seat-bolt` 读回 `null`、`Object.keys` 是空数组，而 `aria-pressed="true"`、`title="回到默认思考强度"`、`aria-valuenow="3"`（Max）。也就是说灯亮**只**来自 `atTop` —— 宿主把这个模型恢复在顶档，旧实现把「已经在顶档」也算成开启态（`boltOn = hasBolt && (boltBack !== null || atTop)`）。改法：开启态只认记忆，`boltOn = hasBolt && boltBack !== null`（2706）；顶档无记忆时新增 `boltIdleAtTop`（2709），按钮保持描边深色、`title` 换成「已经在最高思考强度」、`disabled: sliderDisabled || boltIdleAtTop`（3398），`toggleBolt` 见到它就 return（不发明记忆）；关灯路径（按下回退 / 手动改档 / 换模型 / 复位）一律带 `dropLast: true` 把跨会话镜像 `last` 一起删掉，否则旧按压会在日后某次启动把灯重新点亮（`writeBoltMemory` 的 `else if (dropLast) delete next[BOLT_LAST]`）。`validate` 101 → **103** 项（删 `a restored top level lights the bolt`，加 `the bolt only lights from a memory` / `the bolt is inert at the top` / `turning the bolt off retires the hand-over`），`browser-check` 7b 段由「顶档点亮」改成五条反向断言（顶档深色 / 顶档文案 / `disabled` / 按下无变化 / 退回一档按钮又可用），行数 3579 → **3601**（换模型的清理 effect 与按钮 `disabled` 各多一行、`boltTitle` 三元变三行），§3 两张表与全文锚点/区间按这个基线重算。
 仍待办：
 
-11. **列间键盘导航** —— 用户在 0.1.1 明确说这一轮不做：左/右方向键在供应商列与模型列之间移焦点。现状是 Tab 在卡片内自然穿行、滑块的方向键已实现（`onSliderKey`，`lib/client.js:2788`）。将来要做，注意别让焦点移动触发 `setRect`/`setFrozen` 复量。
-11. **host 半边的 `engines.dsh`** —— 随容器 API 稳定后再复核 `>=0.2.1-rc.2` 是否仍准确。
+12. **列间键盘导航** —— 用户在 0.1.1 明确说这一轮不做：左/右方向键在供应商列与模型列之间移焦点。现状是 Tab 在卡片内自然穿行、滑块的方向键已实现（`onSliderKey`，`lib/client.js:3148`）。将来要做，注意别让焦点移动触发 `setRect`/`setFrozen` 复量。
+13. **host 半边的 `engines.dsh`** —— 随容器 API 稳定后再复核 `>=0.2.1-rc.2` 是否仍准确。
 
 ## 19. 发布流程与提交规范
 

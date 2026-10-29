@@ -155,6 +155,8 @@ const evaluate = async (expression) => {
 
 const TRIGGER = '[data-model-seat="model-trigger"]'
 const EFFORT = '[data-model-seat="effort-trigger"]'
+const BOLT = '[data-model-seat="effort-bolt"]'
+const RESET = '[data-model-seat="effort-reset"]'
 const CARD = '[data-model-seat="menu"]'
 const q = JSON.stringify
 const centerOf = (selector) =>
@@ -362,7 +364,7 @@ try {
       '    slider: slider !== null,',
       '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),',
       '    max: slider === null ? null : slider.getAttribute("aria-valuemax"),',
-      '    bolt: document.querySelector(".gptm-triggerBolt, .gptm-fastToggle") !== null',
+      '    bolt: document.querySelector(' + q(BOLT) + ') !== null',
       '  }',
       '})()',
     ]),
@@ -381,10 +383,11 @@ try {
         '    search: document.querySelector(".ms-col[data-col=models] .ms-search") !== null,',
         '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),',
         '    max: slider === null ? null : slider.getAttribute("aria-valuemax"),',
-        '    bolt: document.querySelector(".gptm-triggerBolt, .gptm-fastToggle") !== null,' +
+        '    bolt: (function () { var b = document.querySelector(' + q(BOLT) + '); return b === null ? null : { pressed: b.getAttribute("aria-pressed"), label: b.getAttribute("aria-label"), fill: getComputedStyle(b.querySelector(".gptm-boltFill")).opacity, outline: getComputedStyle(b.querySelector(".gptm-boltOutline")).opacity } })(),' +
         '    trail: (function () { var t = document.querySelector(".gptm-trail"); return t === null ? null : getComputedStyle(t).opacity })(),' +
         '    particles: document.querySelectorAll(".gptm-particle").length,' +
         '    drift: (function () { var p = document.querySelector(".gptm-particle"); if (p === null) return null; var c = getComputedStyle(p); return { name: c.animationName, spin: (c.getPropertyValue("--spin") || "").trim(), running: p.getAnimations ? p.getAnimations().length : null } })(),',
+        '    inset: (function () { if (el === null) return null; var r = el.getBoundingClientRect(); var a = el.firstElementChild.getBoundingClientRect(); var b = el.lastElementChild.getBoundingClientRect(); return { top: Math.round(a.top - r.top), bottom: Math.round(r.bottom - b.bottom) } })(),',
         '    height: el === null ? null : Math.round(el.getBoundingClientRect().height),',
         '    box: el === null ? null : { width: Math.round(el.getBoundingClientRect().width), height: Math.round(el.getBoundingClientRect().height) },',
         '    contrast: (function () {',
@@ -393,7 +396,7 @@ try {
         '      function R(f, b) { var x = L(f), y = L(b); return Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100 }',
         '      function S(n) { var t = null; while (n !== null) { var c = P(getComputedStyle(n).backgroundColor); if (c !== null && c.a > 0.01) { if (t === null) t = c; else return { r: c.r * (1 - t.a) + t.r * t.a, g: c.g * (1 - t.a) + t.g * t.a, b: c.b * (1 - t.a) + t.b * t.a } } n = n.parentElement } return t === null ? { r: 255, g: 255, b: 255 } : t }',
         '      function C(sel) { var n = document.querySelector(sel); if (n === null) return null; var c = P(getComputedStyle(n).color); return c === null ? null : R(c, S(el)) }',
-        '      return { reset: C(".gptm-head .gptm-iconBtn:last-of-type"), model: C(".gptm-statusModel") }',
+        '      return { reset: C(' + q(RESET) + '), bolt: C(' + q(BOLT) + '), model: C(".gptm-statusModel") }',
         '    })(),',
         '  }',
         '})()',
@@ -401,7 +404,13 @@ try {
     )
     check('the effort trigger opens the thinking pane', pane.slider === true, JSON.stringify(pane))
     check('the thinking pane carries no model search box', pane.search === false, JSON.stringify(pane))
-    check('the thinking pane has no bolt control', pane.bolt === false, JSON.stringify(pane.bolt))
+    // 0.2.1: the bolt is back on the head. The live check reads it, it does not
+    // press it: a press publishes a reasoning effort to the account directory.
+    check(
+      'the bolt is offered and starts unpressed',
+      pane.bolt !== null && typeof pane.bolt === 'object' && pane.bolt.pressed === 'false' && pane.bolt.fill === '0' && pane.bolt.outline === '1',
+      JSON.stringify(pane.bolt),
+    )
     check('the drift trail is always on', pane.trail !== null && Number(pane.trail) >= 0.99, String(pane.trail))
     check(
       'the particles drift at full strength',
@@ -422,7 +431,15 @@ try {
     check('the drift resumes when motion is allowed', resumed !== null && resumed.name === 'gptm-drift' && resumed.running === 1, JSON.stringify(resumed))
     check('the thinking pane keeps one frozen height', typeof pane.height === 'number', String(pane.height))
     check('the card shrinks to the thinking pane', pane.box.height < 300, JSON.stringify(pane.box))
+    // 0.2.1: the frame is the pane's natural height, so the content sits inset
+    // by the same amount top and bottom - no slack pooled under the slider.
+    check(
+      'the thinking pane is inset equally at the top and the bottom',
+      pane.inset !== null && pane.inset.top === pane.inset.bottom,
+      JSON.stringify(pane.inset),
+    )
     check('the pane icon reads on the card surface', pane.contrast.reset >= 3, JSON.stringify(pane.contrast))
+    check('the bolt reads on the card surface', pane.contrast.bolt >= 3, JSON.stringify(pane.contrast))
     check('the pane model line reads on the card surface', pane.contrast.model >= 4.5, JSON.stringify(pane.contrast))
     // The defect the user reported: switching panes used to keep the columns'
     // frozen 420px on the shorter panel. Going back must restore both.

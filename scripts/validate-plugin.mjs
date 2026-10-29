@@ -119,7 +119,75 @@ check('seat config key present', /dsh-client-ui-model-seat:config:v1/.test(bundl
 // bundle that still mentions the key is one that still has the switch in it.
 check('no fast-mode store', !/dsh-client-ui-model-seat:fast:v1/.test(bundleSource))
 check('no fast-mode switch', !/fast-toggle|fastToggle|useFastLock|LONG_PRESS_MS/.test(bundleSource))
-check('no bolt or lock drawing', !/function (Bolt|LockIcon|LockMark)\(/.test(bundleSource))
+check('no lock drawing', !/function (LockIcon|LockMark)\(/.test(bundleSource))
+// The bolt came back in 0.2.1, but as a plain LEVEL JUMP: it drives the same
+// levels the slider offers and remembers the one it left. It must not drag
+// the removed fast-mode lock back in with it.
+check('bolt drawing present', /function Bolt\(/.test(bundleSource))
+check('bolt remembers its level', /writeBoltMemory\(sessionKey, \{/.test(bundleSource))
+check('bolt restores by effort id', /level\.effort === memory\.effort/.test(bundleSource))
+check('bolt jumps to the top level', /applyLevel\(levels\.length - 1/.test(bundleSource))
+check('bolt needs two levels', /const hasBolt = levels\.length > 1/.test(bundleSource))
+// The memory is a fact about ONE conversation, so it is keyed by the session id
+// the seat's own `inject` hands over and persisted, which is what keeps the
+// bolt on across a restart of the app.
+check('bolt memory is per session', /records\[sessionKey\]/.test(bundleSource))
+check(
+  'bolt memory survives a restart',
+  /const BOLT_KEY = 'dsh-client-ui-model-seat:bolt:v1'/.test(bundleSource) &&
+    /writeStorage\(BOLT_KEY, JSON\.stringify\(memory\)\)/.test(bundleSource),
+)
+// localStorage is bucketed by host AND PORT, and dsh restarts on a new port,
+// so the memory also travels in a host-scoped cookie.
+check(
+  'bolt memory mirrors into a cookie',
+  /const BOLT_COOKIE = 'dsh-model-seat-bolt'/.test(bundleSource) &&
+    /writeBoltCookie\(memory\)/.test(bundleSource),
+)
+check(
+  'the cookie mirror is host-scoped',
+  /path=\/; max-age=31536000; SameSite=Lax/.test(bundleSource),
+)
+check(
+  'the cookie mirror is read when storage is gone',
+  /parseBoltMemory\(readCookie\(BOLT_COOKIE\)\)/.test(bundleSource),
+)
+check(
+  'bolt memory belongs to one model',
+  /record\.provider === provider/.test(bundleSource) &&
+    /record\.model === model/.test(bundleSource),
+)
+// 0.2.2: sitting at the top is not a press. A model that OPENS at its top level
+// (measured on the real app: DeepSeek-V4.1-Flash comes back at Max with an empty
+// bolt store) used to show a permanently lit button that nobody had pressed, and
+// the user read that as "the bolt is on by default". On now means one thing: a
+// memory of the level to go back to.
+check('the bolt only lights from a memory', /const boltOn = hasBolt && boltBack !== null/.test(bundleSource))
+check(
+  'the bolt is inert at the top',
+  /const boltIdleAtTop = hasBolt && atTop && boltBack === null/.test(bundleSource) &&
+    /disabled: sliderDisabled \|\| boltIdleAtTop/.test(bundleSource),
+)
+check('turning the bolt off retires the hand-over', /delete next\[BOLT_LAST\]/.test(bundleSource))
+// A restart opens a NEW conversation, so the per-session record cannot answer
+// there; the mirror from the last launch does, and only while already at the top.
+check('bolt outlives its conversation', /const BOLT_LAST = 'last'/.test(bundleSource))
+check(
+  'the hand-over only speaks at the top',
+  /if \(atTop !== true\) return null/.test(bundleSource) &&
+    /records\[BOLT_LAST\]/.test(bundleSource),
+)
+check(
+  'the hand-over is never aged out',
+  /filter\(\(key\) => key !== BOLT_LAST\)/.test(bundleSource),
+)
+// One frame floor per layout: a single shared number put the thinking pane's
+// slack under the slider (0.2.1), and the models pane wants eight rows.
+check(
+  'per-layout frame floor',
+  /layout === 'columns' \? MODELS_MIN_HEIGHT : PANEL_MIN_HEIGHT/.test(bundleSource),
+)
+check('eight-row model floor', /MODELS_ROW_HEIGHT \* MODELS_MIN_ROWS/.test(bundleSource))
 
 // The upstream aliases are gone as of 0.1.1: this machine never had the original
 // plugin installed, so no third-party CSS can hang off them. Everything the
@@ -131,6 +199,8 @@ const SEAT_VALUES = [
   'model-trigger',
   'effort-trigger',
   'thinking-slider',
+  'effort-bolt',
+  'effort-reset',
   'config-panel',
   'config-backdrop',
 ]

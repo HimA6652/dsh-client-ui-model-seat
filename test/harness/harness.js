@@ -78,8 +78,32 @@
     }
   }
   var currentGroup = groups[CURRENT] || groups[0]
+  // dsh persists the chosen reasoning level per session on the Host, so a restart
+  // comes back on the level the user left it on - across a new port, because that
+  // state never lived in the browser. The harness has to do the same, or a reload
+  // would silently reset the level and the seating logic would look wrong for a
+  // reason that only exists in the test bed. It therefore uses a cookie, not
+  // localStorage: the desktop host serves every launch from a new port, and
+  // localStorage is bucketed by host AND port while a cookie is not.
+  var EFFORT_COOKIE = 'harness-effort'
+  function readEffortCookie() {
+    var jar = ''
+    try { jar = String(document.cookie || '') } catch (error) { return null }
+    var parts = jar.split(';')
+    for (var e = 0; e < parts.length; e++) {
+      var at = parts[e].indexOf('=')
+      if (at === -1) continue
+      if (parts[e].slice(0, at).trim() !== EFFORT_COOKIE) continue
+      try { return decodeURIComponent(parts[e].slice(at + 1)) } catch (error) { return null }
+    }
+    return null
+  }
+  function writeEffortCookie(value) {
+    try { document.cookie = EFFORT_COOKIE + '=' + encodeURIComponent(value) + '; path=/; max-age=31536000; SameSite=Lax' } catch (error) { /* private mode */ }
+  }
+  var savedEffort = readEffortCookie()
   var snapshot = {
-    current: { provider: currentGroup.id, model: currentGroup.models[0].id, reasoningEffort: 'medium' },
+    current: { provider: currentGroup.id, model: currentGroup.models[0].id, reasoningEffort: savedEffort || 'medium' },
     groups: groups,
     failures: [],
     pending: null,
@@ -100,6 +124,7 @@
       // not enough: the slider, the check mark and the trigger label only move
       // once the snapshot changes.
       snapshot = Object.assign({}, snapshot, { current: Object.assign({}, snapshot.current, selection) })
+      if (snapshot.current.reasoningEffort) writeEffortCookie(snapshot.current.reasoningEffort)
       listeners.forEach(function (fn) { fn() })
       return Promise.resolve({ ok: true })
     },
@@ -125,6 +150,14 @@
     }
   }
 
+  // The app hands each mounted seat the id of the conversation it belongs to. A
+  // restart opens a NEW conversation, so a scenario has to be able to say which
+  // id it is mounting under; `?session=` does that and defaults to session-1.
+  function sessionId() {
+    var match = /[?&]session=([^&]*)/.exec(window.location.search)
+    return match === null || match[1] === '' ? 'session-1' : decodeURIComponent(match[1])
+  }
+
   var slots = {
     inject: function (name, callback) {
       var handle = callback()
@@ -135,7 +168,7 @@
       host.setAttribute('data-host', 'seat')
       document.getElementById('slot').appendChild(host)
       var root = ReactDOM.createRoot(host)
-      var props = spec.inject('session-1')
+      var props = spec.inject(sessionId())
       props.t = translator(spec.locale)
       root.render(React.createElement(Component, props))
       return { dispose: function () { root.unmount(); host.remove() } }
@@ -161,6 +194,7 @@
     throw new Error('unexpected require ' + name)
   })
   window.__api = api
+  window.__session = sessionId()
   window.__host = { ctx: ctx, store: store, snapshot: snapshot, dictionaries: dictionaries, directory: directory }
   api.apply(ctx)
   window.__ready = true

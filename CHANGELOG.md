@@ -4,13 +4,31 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-29
+
+### Added
+
+- **思考面板头部的闪电按钮**（`data-model-seat="effort-bolt"`）—— 语义与 0.2.0 删掉的那个不同：点一下跳到**最高**思考档位，再点一下回到**按下去之前的那一档**。记忆按 effort id 存（不是下标：模型换了、档位表变了也能对上），任何别的途径改了档位（滑块、方向键、复位、换模型）都会立刻清掉这份记忆，所以永远不会"回到一个已经不存在的位置"。按下时图标由描边变实心、`title` 换成回退语义，两次点击各提交一次选择。只在档位数 > 1 时出现，重置按钮加了 `data-model-seat="effort-reset"`。
+- `npm run docs`（`scripts/doc-anchor-check.mjs`）也挂进了 `npm run check`（0.2.0 已加，这里只是把它列进 0.2.1 的验收集）。
+- `browser-check` 第 5 段扩成闪电循环（跳顶、回退、按 effort id 复原、两次点击的高度都不变、手动改档清记忆）、新增 6b 段（模型列八行下限、240 ms 零高度变化）、7b 段（重载后灯仍亮）、7c 段（换 origin 重启：第二个端口、`localStorage` 读回必须为 `null`）、7d 段（新会话交接：第三个端口 + `?session=session-9`）。
+
 ### Fixed
 
+- **思考面板底部多出一条空白**：卡片高度原先只有一条 `CARD_MIN_HEIGHT = 132` 的下限，而面板的自然高度只有 101，多出的 31px 全落在滑轨下方（flex 列自上而下排）。现在按布局分别取自然高度（双列 333 / 面板 101），上下各留 12px；e2e 断言「顶底内缩相等」，浅深两套实测都是 13/13，卡片高度 101。
+- **供应商只有两三个模型时卡片被压得很矮**：双列布局新增八行下限 `MODELS_MIN_ROWS = 8`（8 × 32px + 卡内其余 76.5px → 333px），多出来的模型由模型列自己滚动。实测 `scrollHeight/clientHeight = 256/256`、240 ms 内高度变化 0 次。
 - **e2e 在「系统开了减少动效」的机器上误判**。`prefers-reduced-motion: reduce` 会把 `.gptm-particle` 的 `animation-name` 算成 `none`，于是「粒子以满强度漂移」这条断言在健康的 bundle 上失败 —— CI 首跑（run `40673400351`）就是这么红的，而本机是 `no-preference`，所以本地永远绿。现在 `browser-check` 与 `live-check` 都显式把 `prefers-reduced-motion` 钉成 `no-preference`，并新增反向断言：切到 `reduce` 时漂移停、粒子停在 `0.35`、卡片入场动画也停，切回来立刻恢复。
+
+- **闪电的「回到哪一档」在重启后丢失**：`localStorage` 按 host **和端口** 分桶，而 dsh 每次启动都换端口（实测 3091 → 3092，同一浏览器 5511 → 5512 读回 `null` 而同 host 的 cookie 仍在），所以真重启之后那份记忆读不到 —— 灯还亮是宿主把档位写进了会话 sidecar（`storages/session_projcache/sessions/session-<id>.json` 的 `modelSelection.val.pending.reasoningEffort`），但按钮会退化成「回到默认思考强度」。现在记忆同时写一份 cookie `dsh-model-seat-bolt`（host 作用域、`path=/`、一年、`SameSite=Lax`；最多 8 个会话 / 3500 字节，超了裁最旧的），`readBoltMemory` 先读 `localStorage`、空了再读 cookie；刻意不做「挂载时把档位拉回最高」的补偿，那会覆盖用户在原生 UI 里手动改的档。`browser-check` 新增 7c 段：第二个 HTTP 服务器占另一个端口，导航过去后先断言 origin 变了、`localStorage` 读回 `null`，再断言灯仍亮、`title` 仍是回退语义、按一下回到 medium 且提交次数为 0（读回而非重写）。
+- **重启后的新会话会把闪电的「回到哪一档」忘掉**：宿主每次启动都新开一个会话（实测 boot1 `session-e3f3e1b1` → boot2 `session-44268fb2`），记忆按会话分桶，新会话里查不到上一会话的记录 —— 灯因为「已经处于顶档」还亮着，回退档位却退化成「回到默认思考强度」。现在 `writeBoltMemory` 同时写一个保留桶 `last`，`boltMemoryFor` 先查本会话、查不到且已经处于顶档才借 `last`（同 provider/model 才认），裁剪时 `last` 永不淘汰。`browser-check` 新增 7d 段：导航到第三个端口、`?session=session-9` 的新会话，`localStorage` 仍为空，灯与回退档位由 `last` 给出，提交次数为 0（读回而非重写）。
+- **闪电看着像「默认开着」**：顶档时按钮是亮的，但用户从没按过。旧实现把「已经在最高档」也算作开启态（`boltOn = hasBolt && (boltBack !== null || atTop)`），而宿主恢复的档位本来就可能就是 Max —— 真机实测（克隆 desktop profile 起一份独立副本）`dsh-client-ui-model-seat:bolt:v1` 与 cookie `dsh-model-seat-bolt` **都是空的**、`keys: []`，`aria-pressed` 依然是 `true`，也就是说灯亮与记忆无关，纯粹是档位在顶。现在开启态只来自「有地方可回」：`boltOn = hasBolt && boltBack !== null`；顶档且没记忆时按钮保持深色（描边）、`title` 换成「已经在最高思考强度」并 `disabled`，按下不发明记忆；任何关灯路径（按下回退 / 滑块或方向键改档 / 换模型 / 复位）都带 `dropLast` 把跨会话镜像 `last` 一起退役，否则旧按压会在日后某次启动把灯重新点亮。`browser-check` 7b 段改成 5 条：顶档深色、顶档文案、顶档 `disabled`、按下它什么都不变、退回一档按钮又可用。
 
 ### Changed
 
+- `npm test` 从 35 条变 41 条（`test/bolt.test.mjs` 6 → 12，新增 `boltMemoryFor` 的交接六条），`validate` 98 → **103** 项（跨会话交接三件套：`bolt outlives its conversation` / `the hand-over only speaks at the top` / `the hand-over is never aged out`；随后「在顶档不算按下」三件套：`the bolt only lights from a memory` / `the bolt is inert at the top` / `turning the bolt off retires the hand-over`）。
+- `validate` 从 82 项变 91 项：`no bolt or lock drawing` 拆成 `no lock drawing` + `bolt drawing present`，另加 `bolt remembers its level` / `bolt restores by effort id` / `bolt jumps to the top level` / `bolt needs two levels` / `per-layout frame floor` / `eight-row model floor`；`SEAT_VALUES` 补 `effort-bolt` / `effort-reset`。
+- `live-check` 在真机上只**读**闪电（`aria-pressed`、图标填充/描边、对比度、顶底内缩），不点它：真机点一下会把 reasoning effort 发布到账号目录。
 - CI 的两个 e2e 步骤在失败时把报告里失败的那几行 `::error::` 成 check-run annotation（公开仓库的 job 日志要登录才能下载，annotations 免登录可读），artifact 另外收 `e2e-*.log`。
+- `MAINTENANCE.md` 按新代码重基线：`client.js` 从 3217 行长到 3601 行（闪电持久化 + cookie 镜像 + 跨会话交接 + 「默认关闭」语义各一次），108 个符号与 29 个区间重定位，段表（补 `BOLT_PATH` / `Bolt` 与 5 个几何常量）、`ModelSeat` 内部 9 块表、§5.1 的下限公式、§9.4 的闪电语义、§11 的各项计数全部对齐；`frame.test.mjs` 的旧断言（短内容 → 132）换成「短内容被本布局下限抬起」（列 333 / 面板 96）。
 
 ## [0.2.0] - 2026-10-28
 

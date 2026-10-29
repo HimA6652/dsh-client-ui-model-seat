@@ -75,7 +75,7 @@ copyFileSync(join(VENDOR, 'react-dom.js'), join(stage, 'react-dom.js'))
 // Served over http rather than opened as file://: localStorage (the card
 // remembers the colour table) needs a real origin.
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8' }
-const server = createServer(async (request, response) => {
+const handler = async (request, response) => {
   const path = decodeURIComponent((request.url ?? '/').split('?')[0])
   const file = join(stage, path === '/' ? 'index.html' : path.replace(/^\//, ''))
   try {
@@ -86,9 +86,27 @@ const server = createServer(async (request, response) => {
     response.writeHead(404, { 'content-type': 'text/plain' })
     response.end('not found')
   }
-})
+}
+const server = createServer(handler)
 await new Promise((done) => server.listen(0, '127.0.0.1', done))
 const origin = 'http://127.0.0.1:' + String(server.address().port)
+// A second listener on its own port: the desktop host serves every launch from
+// a new random port, so 'a restart' means 'a new origin'. Section 7c navigates
+// here to prove the bolt survives that.
+const altServer = createServer(handler)
+await new Promise((done) => altServer.listen(0, '127.0.0.1', done))
+const altOrigin = 'http://127.0.0.1:' + String(altServer.address().port)
+// A third listener for the OTHER half of a restart: dsh opens a NEW conversation
+// on every launch, so section 7d re-enters on a fresh origin under a session id
+// the memory has never seen — only the hand-over mirror can answer there.
+const lastServer = createServer(handler)
+await new Promise((done) => lastServer.listen(0, '127.0.0.1', done))
+const lastOrigin = 'http://127.0.0.1:' + String(lastServer.address().port)
+const closeServers = () => {
+  server.close()
+  altServer.close()
+  lastServer.close()
+}
 
 // ── a browser to drive ─────────────────────────────────────────────────────
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
@@ -170,7 +188,10 @@ const evaluate = async (expression) => {
   return result.result.value
 }
 
-const url = origin + '/index.html?providers=6&models=60&long=0&current=0'
+const QUERY = '/index.html?providers=6&models=60&long=0&current=0'
+const url = origin + QUERY
+const altUrl = altOrigin + QUERY
+const lastUrl = lastOrigin + QUERY + '&session=session-9'
 const created = await send('Target.createTarget', { url: 'about:blank' })
 const targetId = created.targetId
 session = (await send('Target.attachToTarget', { targetId, flatten: true })).sessionId
@@ -194,7 +215,7 @@ for (let i = 0; i < 120 && !ready; i++) {
 }
 if (!check('harness mounts the seat', ready)) {
   console.log(JSON.stringify({ stage, url, problems }, null, 2))
-  server.close()
+  closeServers()
   process.exit(1)
 }
 
@@ -202,6 +223,8 @@ const CARD = '[data-model-seat="menu"]'
 const CARD_Q = JSON.stringify(CARD)
 const TRIGGER = '[data-model-seat="model-trigger"]'
 const EFFORT_TRIGGER = '[data-model-seat="effort-trigger"]'
+const BOLT = '[data-model-seat="effort-bolt"]'
+const RESET = '[data-model-seat="effort-reset"]'
 
 const centerOf = (selector) =>
   evaluate(
@@ -276,7 +299,7 @@ try {
   const trigger = await centerOf(TRIGGER)
   if (!check('model trigger is rendered', trigger !== null)) {
     console.log(JSON.stringify({ problems }, null, 2))
-    server.close()
+    closeServers()
     process.exit(1)
   }
   await clickAt(trigger)
@@ -526,8 +549,24 @@ try {
       '    max: slider === null ? null : slider.getAttribute("aria-valuemax"),\n' +
       '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),\n' +
       '    text: slider === null ? null : slider.getAttribute("aria-valuetext"),\n' +
+      '    inset: (function () {\n' +
+      '      if (el === null) return null\n' +
+      '      var r = el.getBoundingClientRect()\n' +
+      '      var a = el.firstElementChild.getBoundingClientRect()\n' +
+      '      var b = el.lastElementChild.getBoundingClientRect()\n' +
+      '      return { top: Math.round(a.top - r.top), bottom: Math.round(r.bottom - b.bottom) }\n' +
+      '    })(),\n' +
       '    ticks: document.querySelectorAll(".gptm-ticks > *").length,\n' +
-      '    bolt: document.querySelector(".gptm-triggerBolt, .gptm-fastToggle") !== null,\n' +
+      '    bolt: (function () {\n' +
+      '      var b = document.querySelector(' + JSON.stringify(BOLT) + ')\n' +
+      '      if (b === null) return null\n' +
+      '      return {\n' +
+      '        pressed: b.getAttribute("aria-pressed"),\n' +
+      '        label: b.getAttribute("aria-label"),\n' +
+      '        fill: getComputedStyle(b.querySelector(".gptm-boltFill")).opacity,\n' +
+      '        outline: getComputedStyle(b.querySelector(".gptm-boltOutline")).opacity,\n' +
+      '      }\n' +
+      '    })(),\n' +
       '    trail: (function () { var t = document.querySelector(".gptm-trail"); return t === null ? null : getComputedStyle(t).opacity })(),\n' +
       '    particles: document.querySelectorAll(".gptm-particle").length,\n' +
       '    drift: (function () {\n' +
@@ -583,7 +622,8 @@ try {
       '        return c === null ? null : ratio(c, bg)\n' +
       '      }\n' +
       '      return {\n' +
-      '        reset: of(document.querySelector(".gptm-head .gptm-iconBtn:last-of-type")),\n' +
+      '        reset: of(document.querySelector(' + JSON.stringify(RESET) + ')),\n' +
+      '        bolt: of(document.querySelector(' + JSON.stringify(BOLT) + ')),\n' +
       '        model: of(document.querySelector(".gptm-statusModel")),\n' +
       '      }\n' +
       '    })()\n' +
@@ -593,7 +633,13 @@ try {
   check('the effort trigger opens the thinking pane', effort.slider === true, JSON.stringify(effort))
   check('the slider spans the three reasoning levels', effort.max === '2' && effort.now === '1', JSON.stringify([effort.max, effort.now]))
   check('the slider shows a tick per level', effort.ticks >= 3, String(effort.ticks))
-  check('the thinking pane has no bolt control', effort.bolt === false, JSON.stringify(effort.bolt))
+  // 0.2.1: the bolt is back, and it is inert until pressed: outline drawn, fill
+  // hidden, pressed=false.
+  check(
+    'the bolt is offered and starts unpressed',
+    effort.bolt !== null && effort.bolt.pressed === 'false' && effort.bolt.fill === '0' && effort.bolt.outline === '1',
+    JSON.stringify(effort.bolt),
+  )
   check('the drift trail is always on', effort.trail !== null && Number(effort.trail) >= 0.99, String(effort.trail))
   check(
     'the particles drift at full strength',
@@ -605,12 +651,95 @@ try {
   // 0.1.3: the pane carries its own height. When the frozen model-grid frame
   // won, the card stayed 'shape.height' tall with a short pane inside it.
   check('the card shrinks to the thinking pane', effort.pane === 'thinking' && effort.box !== null && effort.box.height < 300, JSON.stringify(effort.box))
+  // 0.2.1: the frame is the pane's NATURAL height, so the content is inset by
+  // the same amount at the top and the bottom. A frame taller than the content
+  // put the whole difference under the slider — the blank band this asserts away.
+  check(
+    'the thinking pane is inset equally at the top and the bottom',
+    effort.inset !== null && effort.inset.top === effort.inset.bottom && effort.inset.top <= 14,
+    JSON.stringify(effort.inset),
+  )
   // 0.1.3: the pane sits on the host's card surface, so every icon and label on
   // it has to be readable in both themes - the fixture used to serve one theme
   // only, which hid white-on-white icons.
   check('the reset icon reads on the card', effort.contrast !== null && effort.contrast.reset >= 3, JSON.stringify(effort.contrast))
+  check('the bolt reads on the card', effort.contrast !== null && effort.contrast.bolt >= 3, JSON.stringify(effort.contrast))
   check('the model line reads on the card', effort.contrast !== null && effort.contrast.model >= 4.5, JSON.stringify(effort.contrast))
   await shot('02-thinking-pane')
+
+  // 0.2.1: the bolt jumps to the top level and remembers the level it replaced,
+  // so a second press goes back to that level by effort id (not by index - the
+  // level list can change under it). Neither press may resize the card, and the
+  // glyph carries its own state: outline when off, fill when on.
+  const READ_BOLT =
+    '(function () {\n' +
+    '  var card = document.querySelector(' + CARD_Q + ')\n' +
+    '  var b = document.querySelector(' + JSON.stringify(BOLT) + ')\n' +
+    '  var s = document.querySelector(".gptm-slider")\n' +
+    '  var all = window.__selections ?? []\n' +
+    '  if (card === null || b === null || s === null) return null\n' +
+    '  return {\n' +
+    '    now: s.getAttribute("aria-valuenow"),\n' +
+    '    pressed: b.getAttribute("aria-pressed"),\n' +
+    '    label: b.getAttribute("aria-label"),\n' +
+    '    fill: getComputedStyle(b.querySelector(".gptm-boltFill")).opacity,\n' +
+    '    outline: getComputedStyle(b.querySelector(".gptm-boltOutline")).opacity,\n' +
+    '    disabled: b.disabled === true,\n' +
+    '    height: Math.round(card.getBoundingClientRect().height),\n' +
+    '    count: all.length,\n' +
+    '    last: all.length === 0 ? null : all[all.length - 1],\n' +
+    '  }\n' +
+    '})()'
+  const readBolt = async () => (await evaluate(READ_BOLT)) ?? {}
+  const pressBolt = async () => {
+    const point = await centerOf(BOLT)
+    if (point === null) return false
+    await clickAt(point)
+    await sleep(300)
+    return true
+  }
+
+  const boltStart = await readBolt()
+  check('the bolt is addressable', await pressBolt())
+  const boltTop = await readBolt()
+  check('the bolt jumps to the top level', boltTop.now === '2' && boltTop.pressed === 'true', JSON.stringify({ now: boltTop.now, pressed: boltTop.pressed }))
+  check('the bolt fills its own glyph when it is on', boltTop.fill === '1' && boltTop.outline === '0', JSON.stringify({ fill: boltTop.fill, outline: boltTop.outline }))
+  check(
+    'the bolt submits the top effort once',
+    boltTop.count === boltStart.count + 1 && boltTop.last !== null && boltTop.last.reasoningEffort === 'high',
+    JSON.stringify({ count: boltTop.count, last: boltTop.last }),
+  )
+  check("the bolt leaves the card's height alone", boltTop.height === effort.box.height, String(boltTop.height) + ' vs ' + String(effort.box.height))
+  check('the bolt retitles itself while it is on', boltTop.label !== boltStart.label, JSON.stringify({ off: boltStart.label, on: boltTop.label }))
+
+  // Jumping to the top raises the quota banner for 1.35s; while it is up the head
+  // is hidden and click-through, so the second press waits it out first.
+  await sleep(1600)
+  check('the bolt is addressable again once the quota banner clears', await pressBolt())
+  const boltBack = await readBolt()
+  check('the bolt returns to the level it replaced', boltBack.now === '1' && boltBack.pressed === 'false', JSON.stringify({ now: boltBack.now, pressed: boltBack.pressed }))
+  check('the bolt empties its glyph again', boltBack.fill === '0' && boltBack.outline === '1', JSON.stringify({ fill: boltBack.fill, outline: boltBack.outline }))
+  check(
+    'the bolt submits the old level once',
+    boltBack.count === boltStart.count + 2 && boltBack.last !== null && boltBack.last.reasoningEffort === 'medium',
+    JSON.stringify({ count: boltBack.count, last: boltBack.last }),
+  )
+  check("the bolt keeps the card's height on the way back", boltBack.height === effort.box.height, String(boltBack.height) + ' vs ' + String(effort.box.height))
+  check('the bolt restores its title', boltBack.label === boltStart.label, JSON.stringify({ off: boltStart.label, back: boltBack.label }))
+
+  // A level change from any other hand drops the memory: the next press records
+  // the level it finds instead of restoring a stale one.
+  check('the bolt is addressable a third time', await pressBolt())
+  await sleep(1600)
+  await evaluate('document.querySelector(".gptm-slider").focus()')
+  await key('ArrowLeft', 'ArrowLeft', 37)
+  await sleep(250)
+  const boltDropped = await readBolt()
+  check(
+    'moving the level by hand drops the bolt',
+    boltDropped.now === '1' && boltDropped.pressed === 'false' && boltDropped.fill === '0',
+    JSON.stringify({ now: boltDropped.now, pressed: boltDropped.pressed, fill: boltDropped.fill }),
+  )
 
   const sliderFocused = await evaluate(
     '(function () {\n' +
@@ -621,6 +750,7 @@ try {
       '})()',
   )
   check('the slider takes focus', sliderFocused === true)
+  const beforeKey = await evaluate('(window.__selections ?? []).length')
   await key('ArrowRight', 'ArrowRight', 39)
   await sleep(200)
   const afterKey = await evaluate(
@@ -633,9 +763,10 @@ try {
   check('ArrowRight raises the level', afterKey.now === '2', String(afterKey.now))
   check(
     'the keyboard submits the new effort',
-    afterKey.selections.length === 2 && afterKey.selections[1].reasoningEffort === 'high',
+    afterKey.selections.length === beforeKey + 1 && afterKey.selections[beforeKey].reasoningEffort === 'high',
     JSON.stringify(afterKey.selections),
   )
+
 
   // ═══ 5b. reduced motion: the drift stops, then comes back ═════════════════
   // CI run 40673400351 proved this branch needs testing from both sides: the
@@ -666,14 +797,14 @@ try {
     JSON.stringify(resumed),
   )
 
-  // Fast mode has no switch left: the bolt, its lock and the long press are gone,
-  // and the trail runs unconditionally. What is left to probe in the head is the
-  // reset button beside the status title.
+  // Fast mode still has no switch: the long press went away in 0.1.3 and the
+  // bolt now drives the reasoning level instead. What is left to probe in the
+  // head is the reset button beside the status title.
   await sleep(1700)
   const headReady = await evaluate(
     '(() => {\n' +
       '  var head = document.querySelector(".gptm-head")\n' +
-      '  var btn = document.querySelector(".gptm-head .gptm-iconBtn")\n' +
+      '  var btn = document.querySelector(' + JSON.stringify(RESET) + ')\n' +
       '  var box = btn === null ? null : btn.getBoundingClientRect()\n' +
       '  var top = box === null ? null : document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)\n' +
       '  return {\n' +
@@ -686,7 +817,8 @@ try {
   check('the quota hint clears and the head folds back', headReady.quota === 'false' && headReady.reset === true, JSON.stringify(headReady))
   check('the reset button is the topmost node at its own centre', headReady.topmost === true, JSON.stringify(headReady))
 
-  const resetPoint = await centerOf('.gptm-head .gptm-iconBtn')
+  const beforeReset = await evaluate('(window.__selections ?? []).length')
+  const resetPoint = await centerOf(RESET)
   check('the reset button is addressable', resetPoint !== null)
   if (resetPoint !== null) {
     await clickAt(resetPoint)
@@ -705,7 +837,7 @@ try {
   check('the reset button restores the model default level', afterReset.now === '1', String(afterReset.now))
   check(
     'the reset submits the default effort',
-    afterReset.selections.length === 3 && afterReset.selections[2].reasoningEffort === 'medium',
+    afterReset.selections.length === beforeReset + 1 && afterReset.selections[beforeReset].reasoningEffort === 'medium',
     JSON.stringify(afterReset.selections),
   )
   check('nothing writes the retired fast-mode key', afterReset.fastStore === null, String(afterReset.fastStore))
@@ -720,6 +852,16 @@ try {
     'document.querySelector(".ms-cols") !== null && document.querySelector(".ms-search") !== null',
   )
   check('the head status button returns to the model columns', back === true)
+
+  // ═══ 6b. the eight-row floor under the model column ═══════════════════════
+  // 0.2.1: a provider with three models used to shrink the card to whatever the
+  // content needed. It now never gets shorter than eight model rows; the column
+  // scrolls the rest, and the floor is a constant so nothing can oscillate.
+  const shortCard = await record('eight-row floor', 240)
+  const modelsClient = shortCard.modelsScroll === null ? 0 : Number(String(shortCard.modelsScroll).split('/')[1])
+  check('the card is at least eight model rows tall', shortCard.height >= 333 && shortCard.height <= 334, String(shortCard.height))
+  check('the model column fits eight rows and scrolls the rest', modelsClient >= 256, String(shortCard.modelsScroll))
+  check('the floor is a constant, so the card cannot oscillate', shortCard.changes === 0, JSON.stringify(shortCard.distinctHeights))
 
   // ═══ 7. the colour panel hotkey ════════════════════════════════════════════
   await key('G', 'KeyG', 71, 11)
@@ -736,6 +878,232 @@ try {
   await key('G', 'KeyG', 71, 11)
   await sleep(250)
   check('the hotkey closes it again', (await evaluate('document.querySelector("[data-model-seat=\\"config-panel\\"]") === null')))
+
+
+  // ═══ 7b. the bolt survives a reload ═══════════════════════════════════════
+  // The user reported it on 2026-10-29: the bolt was on in a conversation, dsh
+  // was restarted, and the button came back looking off. The memory is a fact
+  // about the conversation, so it lives in localStorage keyed by session id and
+  // comes back lit without being pressed again. `Page.navigate` re-runs the
+  // bundle against the same storage, which is what a restart does to the client
+  // half of the plugin.
+  const reloadFixture = async () => {
+    await send('Page.navigate', { url }, session)
+    let ready = false
+    for (let i = 0; i < 120 && !ready; i++) {
+      await sleep(50)
+      ready = await evaluate('window.__ready === true').catch(() => false)
+    }
+    check('the fixture comes back after a reload', ready === true)
+    const point = await centerOf(EFFORT_TRIGGER)
+    if (point !== null) await clickAt(point)
+    await sleep(400)
+  }
+
+  // The card sections above left the seat on prov-3; the fixture's own URL
+  // restores prov-0. Reload first so the memory written below belongs to the
+  // model the page comes back to - otherwise the ownership guard (correctly)
+  // refuses to light the bolt and the reload assertions would test nothing.
+  await reloadFixture()
+  const boltForeign = await readBolt()
+  check(
+    'a memory from another model does not light the bolt',
+    boltForeign.pressed === 'false' && boltForeign.fill === '0',
+    JSON.stringify({ pressed: boltForeign.pressed, label: boltForeign.label }),
+  )
+
+  // 0.2.2: reaching the top by hand is not a press. A model whose restored level
+  // already IS the top (the real app restores Max for DeepSeek-V4.1-Flash, with an
+  // empty bolt store) used to show a lit button nobody had pressed, and the user
+  // read that as "on by default". Sitting at the top is not a press: the bolt stays
+  // dark, says it has nowhere to go, and is disabled. Pressing it there must not
+  // invent a memory either.
+  await evaluate('document.querySelector(".gptm-slider").focus()')
+  await key('ArrowRight', 'ArrowRight', 39)
+  await sleep(250)
+  const boltManualTop = await readBolt()
+  check(
+    'a top level reached by hand leaves the bolt dark',
+    boltManualTop.now === '2' && boltManualTop.pressed === 'false' && boltManualTop.fill === '0' && boltManualTop.outline === '1',
+    JSON.stringify({ now: boltManualTop.now, pressed: boltManualTop.pressed, fill: boltManualTop.fill }),
+  )
+  check(
+    'the dark bolt at the top says there is nowhere to go',
+    boltManualTop.label === '已经在最高思考强度',
+    JSON.stringify({ label: boltManualTop.label }),
+  )
+  check(
+    'the dark bolt at the top is disabled',
+    boltManualTop.disabled === true,
+    JSON.stringify({ disabled: boltManualTop.disabled }),
+  )
+  // The jump above announced the top level, which fades the whole head out for
+  // 1.35 s (`pointer-events: none`) - a press while that banner is up would land on
+  // whatever is underneath instead of the button. Wait it out first.
+  await sleep(1600)
+  const boltIdleClicked = await pressBolt()
+  const boltIdleAfter = await readBolt()
+  check(
+    'pressing the disabled bolt changes nothing',
+    boltIdleClicked === true && boltIdleAfter.now === '2' && boltIdleAfter.pressed === 'false' && boltIdleAfter.count === boltManualTop.count,
+    JSON.stringify({ now: boltIdleAfter.now, pressed: boltIdleAfter.pressed, count: boltIdleAfter.count, was: boltManualTop.count }),
+  )
+  // One step down by hand and there IS somewhere to go, so the bolt is offered
+  // again - this is the state the reload assertions below start from.
+  await evaluate('document.querySelector(".gptm-slider").focus()')
+  await key('ArrowLeft', 'ArrowLeft', 37)
+  await sleep(250)
+  const boltManualDown = await readBolt()
+  check(
+    'stepping off the top offers the bolt again',
+    boltManualDown.now === '1' && boltManualDown.pressed === 'false' && boltManualDown.disabled === false,
+    JSON.stringify({ now: boltManualDown.now, pressed: boltManualDown.pressed, disabled: boltManualDown.disabled }),
+  )
+
+  // Press it for real on prov-0/p0-0, then reload: it has to come back lit, from
+  // the same model, still offering the remembered level.
+  await sleep(1600)
+  check('the bolt is addressable before the reload', await pressBolt())
+  const boltBeforeReload = await readBolt()
+  check(
+    'the bolt is on before the reload',
+    boltBeforeReload.now === '2' && boltBeforeReload.pressed === 'true',
+    JSON.stringify({ now: boltBeforeReload.now, pressed: boltBeforeReload.pressed }),
+  )
+  await reloadFixture()
+  const boltAfterReload = await readBolt()
+  check(
+    'the bolt is still lit after a reload',
+    boltAfterReload.now === '2' && boltAfterReload.pressed === 'true' && boltAfterReload.fill === '1' && boltAfterReload.outline === '0',
+    JSON.stringify({ now: boltAfterReload.now, pressed: boltAfterReload.pressed, fill: boltAfterReload.fill, label: boltAfterReload.label }),
+  )
+  check(
+    'the restored bolt remembers the level it replaced',
+    boltAfterReload.label === boltBack.label || boltAfterReload.label === '回到开启前的思考强度',
+    JSON.stringify({ remembered: boltBack.label, after: boltAfterReload.label }),
+  )
+  await sleep(200)
+  check('the bolt is addressable after the reload', await pressBolt())
+  const boltBackAfterReload = await readBolt()
+  check(
+    'the restored bolt goes back to the remembered level',
+    boltBackAfterReload.now === '1' && boltBackAfterReload.pressed === 'false',
+    JSON.stringify({ now: boltBackAfterReload.now, pressed: boltBackAfterReload.pressed }),
+  )
+
+  // And the clear survives too, otherwise a release would come back lit forever.
+  await reloadFixture()
+  const boltClearAfterReload = await readBolt()
+  check(
+    'the clear survives a reload as well',
+    boltClearAfterReload.pressed === 'false' && boltClearAfterReload.now === '1',
+    JSON.stringify({ now: boltClearAfterReload.now, pressed: boltClearAfterReload.pressed }),
+  )
+  // ═══ 7c. the bolt survives a restart on a NEW origin ══════════════════════
+  // A restart of the desktop app is a new origin, not a reload: the host starts
+  // its UI server with `--port 0` (measured 3091 -> 3092 across one restart) and
+  // Chromium buckets localStorage by host AND port, so the copy written before
+  // the restart is unreachable (measured: same profile, 5511 -> 5512, localStorage
+  // null while the cookie still read back). The memory therefore has to travel in
+  // the cookie mirror, and the level comes back from the host - which the fixture
+  // mirrors by keeping the level in a cookie as well.
+  await sleep(1600)
+  check('the bolt is addressable before the restart', await pressBolt())
+  const boltBeforeRestart = await readBolt()
+  check(
+    'the bolt is on before the restart',
+    boltBeforeRestart.pressed === 'true' && boltBeforeRestart.now === '2',
+    JSON.stringify({ now: boltBeforeRestart.now, pressed: boltBeforeRestart.pressed }),
+  )
+
+  await send('Page.navigate', { url: altUrl }, session)
+  let altReady = false
+  for (let i = 0; i < 120 && !altReady; i++) {
+    await sleep(50)
+    altReady = await evaluate('window.__ready === true').catch(() => false)
+  }
+  check('the fixture comes back on another origin', altReady === true)
+  const altSeen = await evaluate('location.origin')
+  check('the restart really changed the origin', altSeen === altOrigin, String(altSeen))
+  const altStorage = await evaluate(
+    '(() => { try { return localStorage.getItem("dsh-client-ui-model-seat:bolt:v1") } catch (error) { return "ERR" } })()',
+  )
+  check('localStorage does not follow the restart', altStorage === null, String(altStorage))
+  const altPoint = await centerOf(EFFORT_TRIGGER)
+  if (altPoint !== null) await clickAt(altPoint)
+  await sleep(500)
+  const boltAfterRestart = await readBolt()
+  check(
+    'the host brings the level back after a restart',
+    boltAfterRestart.now === boltBeforeRestart.now,
+    JSON.stringify({ before: boltBeforeRestart.now, after: boltAfterRestart.now }),
+  )
+  check(
+    'the bolt is still lit after a restart on a new origin',
+    boltAfterRestart.pressed === 'true' && boltAfterRestart.fill === '1' && boltAfterRestart.outline === '0',
+    JSON.stringify({ pressed: boltAfterRestart.pressed, fill: boltAfterRestart.fill, outline: boltAfterRestart.outline }),
+  )
+  check(
+    'the restored bolt still knows the level it replaced',
+    boltAfterRestart.label === '回到开启前的思考强度',
+    JSON.stringify({ label: boltAfterRestart.label }),
+  )
+  await sleep(200)
+  check('the bolt is addressable after the restart', await pressBolt())
+  const boltBackAfterRestart = await readBolt()
+  check(
+    'the restored bolt returns to the remembered level',
+    boltBackAfterRestart.now === '1' && boltBackAfterRestart.pressed === 'false',
+    JSON.stringify({ now: boltBackAfterRestart.now, pressed: boltBackAfterRestart.pressed }),
+  )
+
+  // ═══ 7d. a restart also opens a NEW conversation ═══════════════════════════
+  // The other half of the restart, measured on the real app: one launch ran
+  // session-77c59394 and the next session-f0ccf4b8, so the per-session record
+  // can never answer there. The hand-over mirror written by the last jump does —
+  // and only while the level already sits at the top.
+  await sleep(1600)
+  check('the bolt is addressable before the new conversation', await pressBolt())
+  const boltHandOffSource = await readBolt()
+  check(
+    'the jump that has to be handed over is recorded',
+    boltHandOffSource.now === '2' && boltHandOffSource.pressed === 'true',
+    JSON.stringify({ now: boltHandOffSource.now, pressed: boltHandOffSource.pressed }),
+  )
+
+  await send('Page.navigate', { url: lastUrl }, session)
+  let lastReady = false
+  for (let i = 0; i < 120 && !lastReady; i++) {
+    await sleep(50)
+    lastReady = await evaluate('window.__ready === true').catch(() => false)
+  }
+  check('the fixture comes back as a new conversation', lastReady === true)
+  const lastSeen = await evaluate('location.origin')
+  check('the new conversation is a new origin as well', lastSeen === lastOrigin, String(lastSeen))
+  const lastSession = await evaluate('window.__session')
+  check('the new conversation mounts under another session id', lastSession === 'session-9', String(lastSession))
+  const lastPoint = await centerOf(EFFORT_TRIGGER)
+  if (lastPoint !== null) await clickAt(lastPoint)
+  await sleep(500)
+  const boltHandOff = await readBolt()
+  check(
+    'a brand-new conversation still finds the bolt lit',
+    boltHandOff.now === '2' && boltHandOff.pressed === 'true' && boltHandOff.fill === '1' && boltHandOff.outline === '0',
+    JSON.stringify({ now: boltHandOff.now, pressed: boltHandOff.pressed, fill: boltHandOff.fill, outline: boltHandOff.outline }),
+  )
+  check(
+    'the hand-over names the level it replaced',
+    boltHandOff.label === '回到开启前的思考强度',
+    JSON.stringify({ label: boltHandOff.label }),
+  )
+  await sleep(200)
+  check('the handed-over bolt is addressable', await pressBolt())
+  const boltHandOffBack = await readBolt()
+  check(
+    'the handed-over bolt returns to that level',
+    boltHandOffBack.now === '1' && boltHandOffBack.pressed === 'false',
+    JSON.stringify({ now: boltHandOffBack.now, pressed: boltHandOffBack.pressed }),
+  )
 
   // ═══ 8. nothing the seat did leaked a console error ════════════════════════
   const consoleErrors = await evaluate('(window.__errors ?? []).length')
@@ -755,7 +1123,29 @@ try {
     drift: { trail: effort.trail, particles: effort.particles, animation: effort.drift },
     scheme: SCHEME,
     thinking: { slider: effort.slider, max: effort.max, now: effort.now, ticks: effort.ticks, hints: effort.hints },
-    pane: { pane: effort.pane, box: effort.box, contrast: effort.contrast },
+    pane: { pane: effort.pane, box: effort.box, contrast: effort.contrast, inset: effort.inset },
+    bolt: {
+      start: boltStart,
+      top: boltTop,
+      back: boltBack,
+      dropped: boltDropped,
+      foreign: boltForeign,
+      manualTop: boltManualTop,
+      idlePress: boltIdleAfter,
+      manualDown: boltManualDown,
+      beforeReload: boltBeforeReload,
+      afterReload: boltAfterReload,
+      backAfterReload: boltBackAfterReload,
+      clearAfterReload: boltClearAfterReload,
+      beforeRestart: boltBeforeRestart,
+      afterRestart: boltAfterRestart,
+      backAfterRestart: boltBackAfterRestart,
+      handOffSource: boltHandOffSource,
+      handOff: boltHandOff,
+      handOffBack: boltHandOffBack,
+    },
+    restart: { origin: altSeen, storage: altStorage, lastOrigin: lastSeen, lastSession },
+    shortCard: { height: shortCard.height, changes: shortCard.changes, modelsScroll: shortCard.modelsScroll },
     motion: { reduced: calm, resumed },
     problems,
     shots,
@@ -767,7 +1157,7 @@ try {
     await send('Target.closeTarget', { targetId }).catch(() => {})
     ws.close()
     if (browser !== null) browser.kill()
-    server.close()
+    closeServers()
     // Leave nothing behind: the staged page and the throwaway browser profile
     // are both ours, and a few hundred of them pile up in %TEMP% over a week.
     for (const dir of [stage, browserProfile]) {

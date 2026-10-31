@@ -2,7 +2,7 @@
 
 > 读者：要改这个插件的人（包括未来的你）。
 > 目标：不读 3671 行也能定位改动点；改完知道为什么没坏。
-> 行号基线：`lib/client.js` 共 3671 行、`BUILD = 0.2.1+merge`。**行号会漂移**，
+> 行号基线：`lib/client.js` 共 3671 行、`BUILD = 0.2.2+merge`。**行号会漂移**，
 > 每一处都同时给了函数名或唯一字符串，以函数名为准、行号为辅。
 
 ## 0. 三十秒上手
@@ -590,7 +590,7 @@ npm run live -- --url "http://127.0.0.1:6124/?token=…"
 ### 17.1 装（web / 普通 profile）
 
 ```bash
-# 从 npm（0.1.2 起；0.2.1 实测 2.7 s，零依赖）
+# 从 npm（0.1.2 起；零依赖；0.2.1 实测 2.7 s）
 node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add dsh-client-ui-model-seat
 
 # 从公开仓库（同样实测可装）
@@ -600,7 +600,7 @@ node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add git
 node <dsh>/node_modules/@deepseek-ai/dsh/lib/bin.js plugin --profile <p> add link:/path/to/dsh-client-ui-model-seat
 ```
 
-npm 通道自 `0.1.2` 起开通（现为 `0.2.1`：`npm view dsh-client-ui-model-seat version` → `0.2.1`，maintainer `hima6652`）。首次发布时 registry 会顺手建一个 `0.0.0-stage` 占位版本，已用 `npm deprecate` 标注说明，装版不会选中它。
+npm 通道自 `0.1.2` 起开通（现为 `0.2.2`：`npm view dsh-client-ui-model-seat version` → `0.2.2`，maintainer `hima6652`）。首次发布时 registry 会顺手建一个 `0.0.0-stage` 占位版本，已用 `npm deprecate` 标注说明，装版不会选中它。
 
 ### 17.2 装（desktop profile）
 
@@ -749,23 +749,23 @@ npm run release 0.2.0 --no-push     # 提交 + 标签，不推
 首次发布（0.1.2）踩到的两个坑，记在这里免得下次当成事故：
 
 - `npm publish` 打印 `+ pkg@x.y.z` 与 "being processed and may take a few minutes" 之后，注册表 packument 会先只有一条 `0.0.0-stage`（描述写着 "Temporary package placeholder for staged publishing"），大约 1 分钟后真版本才落到 `dist-tags.latest`。**不要因此重跑 publish**，用 `npm view <pkg> version` 复核即可。这个占位版本用 `npm deprecate <pkg>@0.0.0-stage "<说明>"` 标注，别 `unpublish`。
-- pnpm 11 默认带 `minimumReleaseAge`（**1440 分钟**）供应链闸门，**写死版本**安装时 pnpm 会把该版本记进 profile 的 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude`（`--profile … add dsh-client-ui-model-seat@0.2.1` 实测通过，装到的就是 `0.2.1`）；开了 `minimumReleaseAgeStrict` 的 profile 会先弹一次确认。
+- pnpm 11 默认带 `minimumReleaseAge`（**1440 分钟**）供应链闸门，**写死版本**安装时 pnpm 会把该版本记进 profile 的 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude`（`--profile … add dsh-client-ui-model-seat@0.2.2` 实测通过，装到的就是 `0.2.2`）；开了 `minimumReleaseAgeStrict` 的 profile 会先弹一次确认。
 - **裸包名不会装到刚发的版本**：`minimumReleaseAge` 会让裸名解析成「满一天的最新版」。实测 2026-10-29T07:26Z 发完 `0.2.1` 之后，`pnpm add dsh-client-ui-model-seat`（以及 `dsh plugin add` 不带版本）装到的是 **`0.1.2`** —— `0.2.0`（前一日 10:37Z）与 `0.2.1` 都还没过闸门。这不是插件 bug；README 里两条安装命令因此写成「写死版本 / 裸包名」并列。判断现场装的是哪版：`node -e "console.log(require('<profile>/node_modules/dsh-client-ui-model-seat/package.json').version)"`。
 
 ### 19.6 渠道对齐（本仓库实际开了几个）
 
 | 渠道 | 现状 | 对齐要求 |
 | --- | --- | --- |
-| git 标签 | `v0.2.1` 已推（annotated `8972323`，peeled `721f591`）；此前 `v0.2.0` annotated `fa57ea3` / peeled `9b13e9a`、`v0.1.2` annotated `4ca9f6b` / peeled `eb8ba43` | 与 `package.json` 的 `version` 一致 |
+| git 标签 | `v0.2.2` 已推（annotated `6837302`，peeled `6903ec5`）；此前 `v0.2.1` annotated `8972323` / peeled `721f591`、`v0.2.0` annotated `fa57ea3` / peeled `9b13e9a`、`v0.1.2` annotated `4ca9f6b` / peeled `eb8ba43` | 与 `package.json` 的 `version` 一致 |
 | GitHub Release | 由 `.github/workflows/release.yml` 在 `v*` 标签上自动创建，正文取 `CHANGELOG.md` 同版本小节 | 发之前把正文里的旧措辞重扫一遍 |
-| npm | 已发布 `0.2.1`（2026-10-29T07:26:03Z，13 文件 243.9 kB / 解包 390.7 kB，shasum `2cd8659`）、`0.2.0`（2026-10-28T10:37:58Z，232.7 kB）与 `0.1.2`（06:38:18Z）；`0.0.0-stage` 是首次发布的占位版本，已 deprecate | 用 `npm run release <ver>` 发，tag / Release / npm 三者同号 |
-| dsh 插件市场 | PR **#10053**（`Add HimA6652/dsh-client-ui-model-seat (ui)`）已开、`Submission gate` 与 `check` 全绿，等维护者合并（见 `MARKET.md`） | 合并后再核对市场页的安装串；上游补 deprecated 的提议写在 PR 正文里 |
+| npm | 已发布 `0.2.2`（2026-10-31T01:04:46Z，13 文件 247.8 kB / 解包 400.3 kB，shasum `e208559`）、`0.2.1`（2026-10-29T07:26:03Z，243.9 kB / 390.7 kB，`2cd8659`）、`0.2.0`（2026-10-28T10:37:58Z，232.7 kB）与 `0.1.2`（06:38:18Z）；`0.0.0-stage` 是首次发布的占位版本，已 deprecate | 用 `npm run release <ver>` 发，tag / Release / npm 三者同号 |
+| dsh 插件市场 | PR **#10053**（`Add HimA6652/dsh-client-ui-model-seat (ui)`）已由维护者 `fkysly` 于 2026-10-28T17:16:36Z 合并（`b6af595`），条目落在 `data/plugins/HimA6652__dsh-client-ui-model-seat.yml`；`awesome-dsh-plugin.com/plugins.json` 里 `name` / `npm` / `install`（`dsh plugin --profile web add dsh-client-ui-model-seat`）/ 三张截图/图标都已生效 | 市场页的 `version` 与 `downloads` 是清单 CI 抓的快照，会滞后于 npm（抓取时停在 `0.2.1`、`downloadsCheckedAt` 2026-10-30）；要更新描述就改自己那条 yml 再开 PR，**不要手改上游 README**；上游补 deprecated 的提议写在 PR 正文里 |
 
 ### 19.7 已记录的决策
 
 - **不改写 git 历史**。首次推送用了 `git add -A` 与散文式提交说明，当时没有任何 npm 制品，改写历史的收益低于风险。从现在起按规范提交，历史留档；这条决定本身写在这里，免得下一个人以为是忘了。
 - **`v0.1.1` 标签早于 `CHANGELOG.md`**。当时的 Release 正文是手写的。**不要**移动或重打 `v0.1.1`：下一个版本号走 `release.mjs`，三条渠道重新对齐。
-- **带 CHANGELOG 的 Release 从 `0.1.2` 起**。`0.1.2`、`0.2.0`、`0.2.1` 都是 `release.mjs` 发的、正文取自 CHANGELOG；下一个版本号从 `0.2.2` 起。
+- **带 CHANGELOG 的 Release 从 `0.1.2` 起**。`0.1.2`、`0.2.0`、`0.2.1`、`0.2.2` 都是 `release.mjs` 发的、正文取自 CHANGELOG；下一个版本号从 `0.2.3` 起。
 - **“先不发”是四层意思**：① 不写版本说明 ② 不提交 ③ 不推送 ④ 不打标签/不发 npm。听到这四个字先问是哪一层，默认按 ①+② 处理（改完留在工作区）。
 
 ### 19.8 提交信息规范

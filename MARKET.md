@@ -3,7 +3,7 @@
 > 目标：让 `dsh-client-ui-model-seat` 出现在 dsh 的「插件市场 → 发现」里，并能一键安装。
 > 本文所有结论都标注了来源；推断项标注「待确认」。今天是 2026-10-28（Asia/Shanghai）。
 
-**当前状态（2026-10-29 更新）**：仓库已公开，`v0.1.1` / `v0.1.2` / `v0.2.0` / `v0.2.1` 四个标签都推了，`github:HimA6652/dsh-client-ui-model-seat` 与 npm 的 `dsh-client-ui-model-seat@0.2.1` 都实测可装；清单 PR **#10053** 已开、`Submission gate` 与 `check` 全绿，等维护者合并。npm 已发布，所以条目里仍然不写 npm 字段——市场 CI 会自己探测 npm 与 star 数（探测到之后安装串会自动变成 `dsh plugin add dsh-client-ui-model-seat`）。提交 PR 之前必须做的两件事：① 先把仓库里的 `scripts/` 自检跑绿（`npm run check`），② 克隆 `awesome-dsh-plugin` 并在本地跑它自己的校验脚本（规范要求：提第三方清单前先跑对方校验器）。
+**当前状态（2026-10-31 更新）**：仓库已公开，`v0.1.1` / `v0.1.2` / `v0.2.0` / `v0.2.1` / `v0.2.2` 五个标签都推了，`github:HimA6652/dsh-client-ui-model-seat` 与 npm 的 `dsh-client-ui-model-seat@0.2.2` 都实测可装；清单 PR **#10053** 已由维护者 `fkysly` 于 2026-10-28T17:16:36Z 合并（merge commit `b6af595`），条目文件 `data/plugins/HimA6652__dsh-client-ui-model-seat.yml` 已在上游 `main`。npm 已发布，所以条目里仍然不写 npm 字段——市场 CI 会自己探测 npm 与 star 数（探测到之后安装串会自动变成 `dsh plugin add dsh-client-ui-model-seat`）。提交 PR 之前必须做的两件事：① 先把仓库里的 `scripts/` 自检跑绿（`npm run check`），② 克隆 `awesome-dsh-plugin` 并在本地跑它自己的校验脚本（规范要求：提第三方清单前先跑对方校验器）。
 
 ## 0. 结论先行
 
@@ -86,7 +86,7 @@ tarball: https://github.com/zszz3/dsh-model-provider-prefix/releases/download/v0
 | `https://github.com` | 连不上 | 不要用 HTTPS 克隆/推送 |
 | `https://api.github.com` | 走 `curl --ssl-no-revoke` 返回 200（schannel 吊销检查离线，不加参数报 `CRYPT_E_REVOCATION_OFFLINE`） | 有 token 时可用 REST |
 | npm registry | 直连正常，已登录 `hima6652` | 可以直接 `npm publish` |
-| npm 包名 | `dsh-client-ui-model-seat` 已由本仓库占用（`0.2.1`）；两个上游仍然是 404 | 先到先得，上游若要发包得改名 |
+| npm 包名 | `dsh-client-ui-model-seat` 已由本仓库占用（`0.2.2`）；两个上游仍然是 404 | 先到先得，上游若要发包得改名 |
 | 本机安装方式 | 已是 `link:E:\...\dsh-client-ui-model-seat` 进 desktop profile | 上架不改变本机行为 |
 
 ## 4. 九步实施
@@ -181,10 +181,29 @@ PR 正文见 §6；**一个 PR 只加这一条**（上限 3 条）。
 ### 步骤 9｜合并后验证
 
 ```sh
-curl -sS https://awesome-dsh-plugin.com/plugins.json | grep -c 'dsh-client-ui-model-seat'   # ≥1
+# 2026-10-31 实测：7924 条里命中 1 条
+curl -sSL https://awesome-dsh-plugin.com/plugins.json -o plugins.json
+node -e "const j=require('./plugins.json');console.log(j.filter(p=>JSON.stringify(p).includes('model-seat')))"
 ```
 
-然后：市场里搜 `model-seat` → 卡片出现（图标是我们的）→ 一键安装 → `dsh plugin list` 里出现 `dsh-client-ui-model-seat` → 触发器与两栏卡片正常 → 卸载两个旧插件后仍然正常。
+2026-10-31 实测到的 `plugins.json` 条目（`name` / `npm` / `install` / 图标 / 三张截图全部生效）：
+
+```json
+{
+  "name": "dsh-client-ui-model-seat",
+  "owner": "HimA6652",
+  "page": "https://awesome-dsh-plugin.com/p/HimA6652/dsh-client-ui-model-seat/",
+  "category": "ui",
+  "npm": "dsh-client-ui-model-seat",
+  "version": "0.2.1",
+  "downloads": 478,
+  "downloadsCheckedAt": "2026-10-30",
+  "install": "dsh plugin --profile web add dsh-client-ui-model-seat",
+  "added": "2026-10-28"
+}
+```
+
+要点：`version` 与 `downloads` 是清单 CI 抓的快照（抓取时 npm 上是 `0.2.1`、下载数是 9/30–10/29 区间），**滞后于 npm 是正常的**，不要拿它判断当前发布的版本。剩下的手工验证：市场里搜 `model-seat` → 卡片出现（图标是我们的）→ 一键安装 → `dsh plugin list` 里出现 `dsh-client-ui-model-seat` → 触发器与两栏卡片正常 → 卸载两个旧插件后仍然正常。
 
 ## 5. 可直接用的 entry
 
@@ -237,7 +256,7 @@ that is what the catalog fields are for. Happy to leave that to your call.
 
 ## 7. 后续发版
 
-1. 改 `package.json` 版本 → `npm publish` → `git tag vX.Y.Z && git push --tags`；
+1. `npm run release <ver>`（一步做完六道门 → 改 `package.json` + `BUILD` → npm publish → 提交 → annotated tag → push，Release 正文由 Actions 从 CHANGELOG 取）；不要手工 `npm publish` + `git tag`，那样三处容易不同号；
 2. entry 文件**不用改**（url 不变；`install` 会跟着 npm 探测结果自动变）；
 3. `stars`、`version`、`downloads` 由清单 CI 每日刷新，市场侧自动跟上；
 4. 界面变了就 `npm run shots` 重拍三张截图推到 main —— `screenshots.json` 在你自己仓库里，夜间构建自动取，不必开 PR；
@@ -255,10 +274,10 @@ that is what the catalog fields are for. Happy to leave that to your call.
 | 与上游同时安装 | 用户没卸载旧插件 | 我们的 bundle 用新行 id `model-seat`，不会撞 id，但三个插件会争同一个槽位；README 已写卸载命令，可选做运行时告警 |
 | 要撤回 | — | npm：72 小时内 `npm unpublish`，之后用 `npm deprecate`；清单：关 PR 或提删除 PR；本机：`dsh plugin remove dsh-client-ui-model-seat` |
 
-## 9. 待确认
+## 9. 待确认（2026-10-31 复核：前四条已落地）
 
-1. **GitHub 账号与仓库名**：SSH 握手返回 `Hi HimA6652!`，故按 `HimA6652/dsh-client-ui-model-seat` 起草；若想换名，改 entry 的 `url`/`name`/文件名三处。
-2. **提交邮箱**：`git config user.email` 目前为空，需要你给一个（用来算提交署名与 GitHub 归属）。
-3. **是否立即发 npm 0.1.1**：清单里 `npm` 是自动探测的，发了之后安装方式变成 `dsh plugin add dsh-client-ui-model-seat` 并开始累计下载量；不发也能上架（走 `github:` 源，安装时需要网络与构建授权）。名字空着，早发早占位。
-4. **是否顺手请维护者 deprecated 两个上游**：合并后它们已成"装了就冲突"的旧形态，标 `replacement` 对用户最省心，但那是维护者的判断。
-5. **README 语言**：现在是英文主文档 + 中文 `MAINTENANCE.md`；清单只要求 entry 的双语描述，不要求 README 双语。要不要补中文 README，等你定。
+1. ~~GitHub 账号与仓库名~~ —— 已定为 `HimA6652/dsh-client-ui-model-seat`，entry 的 `url` / `name` / 文件名三处一致。
+2. ~~提交邮箱~~ —— 已配 `HimA6652 <42709015+HimA6652@users.noreply.github.com>`。
+3. ~~是否立即发 npm~~ —— 已发：`0.1.2`（2026-10-29 06:38Z）起 npm 通道开通，现为 `0.2.2`；清单 CI 已探测到 npm 并把 `install` 改写成 `dsh plugin --profile web add dsh-client-ui-model-seat`。
+4. **是否顺手请维护者 deprecated 两个上游**：合并后它们已成「装了就冲突」的旧形态，标 `replacement` 对用户最省心，但那是维护者的判断。PR 正文里已提，维护者未处理 —— **仍待确认**。
+5. ~~README 语言~~ —— 已补 `README.zh.md`（与英文版顶部的语言开关互指，命令与表格等价；`npm run docs` 的锚点检查覆盖两份）。

@@ -4,9 +4,22 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-31
+
+### Added
+
+- **JetHub 渠道下不再重复画供应商前缀**。dsh-providers-hub 的 JetHub 渠道自己会在输入区右侧打一个供应商徽标，而本插件把 `供应商/模型名` 三位一体画在触发器里，同一个信息出现两次。现在触发器在探测到**同一行**里有渠道徽标时只显示模型名（`p0 model 0`），其它渠道一个字都不变（仍是 `Provider 0/p0 model 0`）。探测只认渠道自己的两个字面量类名 `.dim-jh-badge` / `.dim-jh-badgePending`，且必须先在座位根往上 4 层内找到同时拥有 `conversation.input.right` 兄弟槽的祖先，只在该子树里查徽标 —— 不看模型名、不看宿主 CSS-module 哈希类名、不 provide 也不订阅任何服务。徽标是首次请求后才解析出真实 provider 的，所以用一个 `MutationObserver` 观察同一个祖先节点；没有这样的行时退化成观察父节点，稍后出现的行也能被拾起。`browser-check` 新增第 8 段（挂载时前缀消失、移除徽标后 `Provider 0/p0 model 0` 回来、再塞一个迟到的徽标也要消失），`test/hub.test.mjs` 7 例覆盖兄弟槽隔离与 4 层深度上限。
+
 ### Fixed
 
 - **e2e 的断言按中文写，夹具的语言却跟着浏览器走**，于是 CI（en-US 的 Edge）把控件渲染成英文，「回到开启前的思考强度」这类标签断言全红，本机 zh-CN 永远绿 —— 与上一条 reduced-motion 是同一类错误：环境输入没钉死。现在夹具认 URL 上的 `?lang=zh|en`（`browser-check` 固定跑 `lang=zh` 并把 `window.__lang` 断言成 `zh`，Edge 启动参数也补了 `--lang=zh-CN`），报告里多一个 `lang` 字段。注意 `Emulation.setLocaleOverride` 解决不了这个问题：实测它只改 `Intl`，`navigator.language` 仍是 `en-US`。
+- **`live-check` 把「模型没声明思考档位」误判成面板坏了**。真机 `buddy/deepseek-v4.1-flash` 声明了 `reasoning` 却没有 `efforts` 列表，于是卡片里的思考面板走 `levels.length === 0` 分支、只画一句「当前模型未提供思考强度等级」，而脚本在 `triggers.effort !== null` 的分支里断言滑块、闪电与 42 个粒子 —— 真机上必然 8 条红。现在面板段先读自身的形状（`slider` / `open` / `data-pane` / `.gptm-note`），有档位才跑滑块那组断言，没档位改成断言「面板确实打开在 thinking 页、并且显示空态、不画滑块与粒子」。夹具侧不变（`?providers=&models=` 造出来的目录始终声明档位）。
+
+### Changed
+
+- 随上一段一起涨的计数：`validate` 103 → **107** 项（新增 `the badge probe knows only the channel literals` / `the badge watcher watches the row it probes` / `the provider prefix stands down for the channel` / `the probe is exported for tests`），`npm test` 41 → **48** 条（新增 `test/hub.test.mjs` 7 例），`doc-anchor-check` 107 符号 / 29 区间 → **124 符号 / 31 区间**。
+- `MAINTENANCE.md` 按新代码重基线：`client.js` 从 3601 行长到 **3671** 行，`ModelSeat` 内部表由 9 块扩成 10 块（新增「样式与徽标探测 2952–2978」），段表第 9 段改为 2389–2504 并补 `HUB_BADGE` / `HUB_SLOT` / `HUB_ROW_DEPTH` / `hubRow` / `hubBadgeInRows`，§4 不变量由 10 条变 **11** 条（第 11 条钉住「只认渠道自己的两个字面量类名，且必须先找到同行的 `conversation.input.right` 兄弟槽」），§11.3 夹具旋钮补 `&hub=1`、`&lang=zh|en`、`&session=<id>`。
+- 两份 README 与 `MAINTENANCE.md` 的陈旧计数对齐：e2e 从「九节」改成**十四节**并补上渠道徽标那一节，手写 bundle 的行数 `3217` → **3671**，发布示例命令改成当前版本，§11.2 里 `check-secrets` 的文件数 `34` → **35**（与同表另一处口径统一）。
 
 ## [0.2.1] - 2026-10-29
 

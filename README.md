@@ -41,7 +41,7 @@ no credential access, no host module.
 
 | Surface | Behaviour |
 | --- | --- |
-| Model trigger | `provider/model` as one run of text, plus a caret. Opens the card on the provider+model columns; a second click closes it. |
+| Model trigger | `provider/model` as one run of text, plus a caret. Opens the card on the provider+model columns; a second click closes it. When the composer row already names the provider — dsh-providers-hub's JetHub badge sits in `conversation.input.right` beside the seat — the trigger drops its own prefix and shows the model alone, so the provider is printed once. |
 | Effort trigger | The current thinking level (`Max`, `Medium`, …). Opens the card on the particle slider; rendered only when the selected model declares thinking levels. |
 | Provider column | Every provider in the session directory with its model count, a check on the current provider, and a retry row for a provider whose list failed to load. |
 | Model column | Head shows the provider under the pointer; a 30 px search box sits inside the column. Hovering the provider column swaps the models **without moving the card**. |
@@ -133,21 +133,23 @@ comes back.
 
 ## Install
 
-    dsh plugin add dsh-client-ui-model-seat@0.2.1                        # from the registry (pin it, see below)
+    dsh plugin add dsh-client-ui-model-seat@0.2.2                        # from the registry (pin it, see below)
     dsh plugin add dsh-client-ui-model-seat                              # from the registry (bare name)
     dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # from source
     dsh plugin add link:/absolute/path/to/dsh-client-ui-model-seat       # local checkout
 
 Both channels ship the same tree. The npm page is
 [npmjs.com/package/dsh-client-ui-model-seat](https://www.npmjs.com/package/dsh-client-ui-model-seat);
-the first release on it is `0.1.2` and the current one is `0.2.1`.
+the first release on it is `0.1.2` and the current one is `0.2.2`.
 
 > **A bare name installs an older version.** pnpm 11 gates fresh releases with
 > `minimumReleaseAge` (1440 minutes) by default, so a bare spec resolves to the
 > newest version that is at least a day old — measured on 2026-10-29, right
 > after publishing `0.2.1`, `pnpm add dsh-client-ui-model-seat` installed
-> `0.1.2`. Pin the version (`@0.2.1`) to get it now; pnpm then records it in the
-> profile's `minimumReleaseAgeExclude`.
+> `0.1.2`. This is the mechanism, not a one-off: the day `0.2.2` ships, the
+> newest version that is at least a day old is still `0.2.1`, so a bare name
+> resolves to `0.2.1`. Pin the version (`@0.2.2`) to get it now; pnpm then
+> records it in the profile's `minimumReleaseAgeExclude`.
 
 The plugin bundle inserts one row into the profile (`id: model-seat`) and
 registers its seat at `priority: -2`, so a leftover copy of either original
@@ -200,22 +202,23 @@ store and the desktop app are never involved.
     npm run e2e:dark     # same run under prefers-color-scheme: dark
     npm run check:all    # check + e2e + e2e:dark
     npm run live -- --url URL   # the same checks inside a real dsh
-    npm run release 0.2.0       # gates → npm → commit → tag → push (see CHANGELOG rule)
+    npm run release 0.2.2       # gates → npm → commit → tag → push (see CHANGELOG rule)
 
 `npm run e2e` (`--scheme light|dark`) serves `test/harness/` on a loopback port, opens it in headless
-Edge over CDP and asserts, in nine sections: the two-column card, a constant
+Edge over CDP and asserts, in fourteen sections: the two-column card, a constant
 height while the pointer rests over 60 models, close/reopen determinism, the
 cross-provider query, the empty-query note (one padded `.ms-empty`, zero rows),
 the thinking pane (the bolt, drift always on, its own height, equal top and
-bottom inset, icon and label contrast), the slider keyboard path, the bolt's
-jump to the top level and its return, the eight-row floor under the model
-column, the reset button, the retirement of the fast-mode key, the head status button returning to the columns, the
-colour-panel hotkey, and a clean console. `--shot DIR` writes screenshots;
+bottom inset, icon and label contrast), the reduced-motion branch, the head
+status button returning to the columns, the eight-row floor under the model
+column, the colour-panel hotkey, the bolt surviving a reload, a restart on a new
+origin and a restart into a new conversation, a channel badge in the same row
+suppressing the provider prefix, and a clean console. `--shot DIR` writes screenshots;
 `--dump` prints the card box and its children. The e2e loads React from the
 committed `test/vendor/` UMD builds, so a fresh clone needs no external
 directory and no network; `--vendor DIR` / `REACT_VENDOR=DIR` override it.
 
-`lib/client.js` is **hand-written** — a 3217-line single-file bundle with no
+`lib/client.js` is **hand-written** — a 3671-line single-file bundle with no
 build step, because `dsh.client` takes one `./client` entry. `tools/merge/gen-client.mjs`
 produced the first draft from the shell bundle and is kept only as a record. It
 now refuses to run without `--force`, and even then backs the current file up to

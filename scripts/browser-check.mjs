@@ -1113,7 +1113,82 @@ try {
     JSON.stringify({ now: boltHandOffBack.now, pressed: boltHandOffBack.pressed }),
   )
 
-  // ═══ 8. nothing the seat did leaked a console error ════════════════════════
+  // ═══ 8. a channel badge in the same row suppresses the provider prefix ═════
+  // dsh-providers-hub prints the provider it routed to in the sibling
+  // `conversation.input.right` slot. Two providers on one composer row read as a
+  // routing bug, so the seat drops its own prefix while that badge is there - and
+  // puts it back the moment the badge leaves, because the channel resolves its
+  // provider only after the first request and can mount or unmount the badge at
+  // any time. The fixture reproduces both shapes with ?hub=1 and a removable
+  // 'data-hub-badge' marker, so no assertion has to guess a hashed class name.
+  const hubUrl = origin + QUERY + '&hub=1'
+  await send('Page.navigate', { url: hubUrl }, session)
+  let hubReady = false
+  for (let i = 0; i < 120 && !hubReady; i++) {
+    await sleep(50)
+    hubReady = await evaluate('window.__ready === true').catch(() => false)
+  }
+  check('the channel fixture mounts', hubReady === true)
+  const readTrigger = async () =>
+    evaluate(
+      '(() => {\n' +
+        '  var t = document.querySelector(' + JSON.stringify(TRIGGER) + ')\n' +
+        '  return {\n' +
+        '    badge: document.querySelector("[data-hub-badge]") !== null,\n' +
+        '    provider: t === null ? null : ((t.querySelector(".gptm-triggerProvider") || {}).textContent ?? null),\n' +
+        '    slash: t === null ? null : ((t.querySelector(".gptm-triggerSlash") || {}).textContent ?? null),\n' +
+        '    label: t === null ? null : t.textContent.trim()\n' +
+        '  }\n' +
+        '})()',
+    )
+  const hubMounted = await readTrigger()
+  check('the channel badge is on the composer row', hubMounted.badge === true, JSON.stringify(hubMounted))
+  check(
+    'the seat drops its own prefix while the channel names the provider',
+    hubMounted.provider === null && hubMounted.slash === null && hubMounted.label === 'p0 model 0',
+    JSON.stringify(hubMounted),
+  )
+  await shot('channel-badge-on')
+  const hubRemoved = await evaluate(
+    '(() => {\n' +
+      '  var badge = document.querySelector("[data-hub-badge]")\n' +
+      '  if (badge === null) return false\n' +
+      '  badge.remove()\n' +
+      '  return document.querySelector("[data-hub-badge]") === null\n' +
+      '})()',
+  )
+  check('the channel badge can be taken away again', hubRemoved === true)
+  await sleep(400)
+  const hubAfter = await readTrigger()
+  check(
+    'the prefix comes back when the channel badge leaves',
+    hubAfter.badge === false && hubAfter.provider === 'Provider 0' && hubAfter.slash === '/' && hubAfter.label === 'Provider 0/p0 model 0',
+    JSON.stringify(hubAfter),
+  )
+  const hubReadded = await evaluate(
+    '(() => {\n' +
+      '  var slot = document.querySelector(\'[data-slot="conversation.input.right"]\')\n' +
+      '  if (slot === null) return false\n' +
+      '  var badge = document.createElement("span")\n' +
+      '  badge.className = "dim-jh-badge"\n' +
+      '  badge.setAttribute("data-hub-badge", "1")\n' +
+      '  badge.textContent = "JetHub"\n' +
+      '  slot.appendChild(badge)\n' +
+      '  return true\n' +
+      '})()',
+  )
+  check('the channel can mount its badge after the seat is already up', hubReadded === true)
+  await sleep(400)
+  const hubLate = await readTrigger()
+  check(
+    'a badge that arrives late suppresses the prefix too',
+    hubLate.badge === true && hubLate.provider === null && hubLate.slash === null && hubLate.label === 'p0 model 0',
+    JSON.stringify(hubLate),
+  )
+  const hubErrors = await evaluate('(window.__errors ?? []).length')
+  check('the channel scenario logged no errors', hubErrors === 0, String(hubErrors))
+
+  // ═══ 9. nothing the seat did leaked a console error ════════════════════════
   const consoleErrors = await evaluate('(window.__errors ?? []).length')
   check('the seat logged no errors', consoleErrors === 0, String(consoleErrors))
 
@@ -1155,6 +1230,7 @@ try {
     },
     restart: { origin: altSeen, storage: altStorage, lastOrigin: lastSeen, lastSession },
     shortCard: { height: shortCard.height, changes: shortCard.changes, modelsScroll: shortCard.modelsScroll },
+    hub: { mounted: hubMounted, removed: hubAfter, late: hubLate },
     motion: { reduced: calm, resumed },
     problems,
     shots,

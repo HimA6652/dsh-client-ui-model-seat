@@ -189,6 +189,36 @@ check(
 )
 check('eight-row model floor', /MODELS_ROW_HEIGHT \* MODELS_MIN_ROWS/.test(bundleSource))
 
+// A channel plugin (dsh-providers-hub's JetHub) prints the provider it routed to
+// on the same composer row, in the sibling `conversation.input.right` slot. Two
+// providers on one row read as a routing bug, so the seat stands its own prefix
+// down while that badge is mounted. The only signal is DOM presence — the host
+// row class names are CSS-module hashes and the channel provides no service — so
+// the probe is fenced: the channel's two literal class names, a bounded walk to
+// the row that owns both slots, and nothing else.
+const dimJh = bundleSource.match(/\.dim-jh-/g) ?? []
+check(
+  'the badge probe knows only the channel literals',
+  dimJh.length === 2 &&
+    bundleSource.includes("const HUB_BADGE = '.dim-jh-badge, .dim-jh-badgePending'") &&
+    bundleSource.includes("const HUB_SLOT = '[data-slot=\"conversation.input.right\"]'"),
+  String(dimJh.length),
+)
+check(
+  'the badge watcher watches the row it probes',
+  /const watched = hubRow\(node\) \?\? node\.parentElement \?\? null/.test(bundleSource) &&
+    /new MutationObserver\(read\)/.test(bundleSource) &&
+    /const HUB_ROW_DEPTH = 4/.test(bundleSource),
+)
+check(
+  'the provider prefix stands down for the channel',
+  /const triggerProvider =\s*hubBadge \|\|/.test(bundleSource),
+)
+check(
+  'the probe is exported for tests',
+  /hubBadgeInRows,\s*hubRow,/.test(bundleSource),
+)
+
 // The upstream aliases are gone as of 0.1.1: this machine never had the original
 // plugin installed, so no third-party CSS can hang off them. Everything the
 // runtime and the checks address must be a `data-model-seat` value.

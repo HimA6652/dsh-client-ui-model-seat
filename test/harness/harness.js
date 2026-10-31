@@ -5,6 +5,10 @@
  * Query: providers=N models=M long=I current=K
  *   one provider owns M models (the rest own three), which is the shape that
  *   used to make the popover grow and shrink under a still pointer.
+ * Query: hub=1
+ *   mounts the seat the way a channel plugin's composer row does: a sibling
+ *   `conversation.input.right` anchor carrying the channel's provider badge.
+ *   The seat hides its own provider prefix while that badge is there.
  * Query: demo=1
  *   the same seat over a realistic provider set, for the storefront
  *   screenshots (scripts/shots.mjs). Nothing else reads it.
@@ -166,6 +170,41 @@
     return match === null || match[1] === '' ? 'session-1' : decodeURIComponent(match[1])
   }
 
+  // ?hub=1 reproduces the composer row a channel plugin builds (dsh-providers-hub's
+  // JetHub): one flex row holding two `display: contents` slot anchors, the
+  // channel's provider badge in `conversation.input.right` and the seat in
+  // `conversation.input.model`. The seat steps its provider prefix aside while
+  // that badge is there. Without the flag the seat mounts into a bare div, which
+  // is what every other scenario wants: no badge anywhere on the page.
+  //
+  // The class name is the channel's own createElement literal (`.dim-jh-badge`),
+  // not a hashable CSS-module name, and `data-hub-badge` marks it for the script
+  // so a scenario can remove it without guessing a selector.
+  var mountSlot = document.getElementById('slot')
+  var mountParent = mountSlot
+  var HUB = query.get('hub') === '1'
+  if (HUB) {
+    var hubRow = document.createElement('div')
+    hubRow.className = 'FIXTURE_standardControls'
+    hubRow.style.cssText = 'display:flex;align-items:center;gap:8px'
+    var hubRight = document.createElement('div')
+    hubRight.setAttribute('data-slot', 'conversation.input.right')
+    hubRight.style.display = 'contents'
+    var hubBadge = document.createElement('span')
+    hubBadge.className = 'dim-jh-badge'
+    hubBadge.setAttribute('data-hub-badge', '1')
+    hubBadge.textContent = 'JetHub'
+    hubRight.appendChild(hubBadge)
+    mountSlot.parentNode.appendChild(hubRow)
+    hubRow.appendChild(hubRight)
+    // The mount point itself becomes the channel's model slot: the host anchors
+    // the two slots as siblings, one level above, exactly like the real composer
+    // row. Adding another wrapper here would put the row one ancestor deeper than
+    // the app has it and the seat's bounded walk would stop one step short - a
+    // test bed that fails for a reason the product does not have.
+    mountParent = hubRow
+  }
+
   var slots = {
     inject: function (name, callback) {
       var handle = callback()
@@ -174,7 +213,13 @@
     register: function (spec, Component) {
       var host = document.createElement('div')
       host.setAttribute('data-host', 'seat')
-      document.getElementById('slot').appendChild(host)
+      // Under ?hub=1 the seat's own host is the slot anchor the composer row
+      // holds; its parent is the row, which also holds the channel's badge.
+      if (HUB) {
+        host.setAttribute('data-slot', 'conversation.input.model')
+        host.style.display = 'contents'
+      }
+      mountParent.appendChild(host)
       var root = ReactDOM.createRoot(host)
       var props = spec.inject(sessionId())
       props.t = translator(spec.locale)

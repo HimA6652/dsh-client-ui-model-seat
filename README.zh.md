@@ -39,7 +39,7 @@ dsh 输入区的「模型 + 思考强度」控件。它由两个插件合并而�
 
 | 界面 | 行为 |
 | --- | --- |
-| 模型触发器 | `provider/model` 一串字（斜杠两侧无间距），加一个箭头。点开是 provider + 模型双列卡片；再点一次关闭。 |
+| 模型触发器 | `provider/model` 一串字（斜杠两侧无间距），加一个箭头。点开是 provider + 模型双列卡片；再点一次关闭。若同一行里已经有别人在报 provider —— dsh-providers-hub 的 JetHub 徽标就挂在座位旁边的 `conversation.input.right` 槽里 —— 触发器收起自己的前缀、只显示模型名，供应商只出现一次。 |
 | 强度触发器 | 当前思考档位（`Max`、`Medium`……）。点开是粒子滑块；只有当前模型声明了思考档位时才渲染。 |
 | provider 列 | 会话目录里的全部 provider 与各自模型数，当前 provider 打勾，加载失败的变成重试行。 |
 | 模型列 | 列头显示指针所在 provider；列内有一个 30 px 搜索框。悬停左列只换右列，**卡片本身不动**。 |
@@ -113,16 +113,16 @@ dsh 输入区的「模型 + 思考强度」控件。它由两个插件合并而�
 
 ## 安装
 
-    dsh plugin add dsh-client-ui-model-seat@0.2.1                        # 从 registry（写死版本，见下）
+    dsh plugin add dsh-client-ui-model-seat@0.2.2                        # 从 registry（写死版本，见下）
     dsh plugin add dsh-client-ui-model-seat                              # 从 registry（裸包名）
     dsh plugin add github:HimA6652/dsh-client-ui-model-seat              # 从源码
     dsh plugin add link:/absolute/path/to/dsh-client-ui-model-seat       # 本地检出
 
 两个通道发布的是同一份文件树。npm 页面是
 [npmjs.com/package/dsh-client-ui-model-seat](https://www.npmjs.com/package/dsh-client-ui-model-seat)，
-首次发布是 `0.1.2`，当前版本是 `0.2.1`。
+首次发布是 `0.1.2`，当前版本是 `0.2.2`。
 
-> **裸包名会装到旧版本**：pnpm 11 默认有 `minimumReleaseAge`（1440 分钟）的供应链闸门，裸包名会解析成**「满 24 小时的最新版」**而不是 `latest`——实测 2026-10-29 发完 `0.2.1` 之后 `pnpm add dsh-client-ui-model-seat` 装到的是 `0.1.2`。要立刻装到最新，把版本写死（`@0.2.1`，pnpm 会把它记进 profile 的 `minimumReleaseAgeExclude`）；或者等一天再装。
+> **裸包名会装到旧版本**：pnpm 11 默认有 `minimumReleaseAge`（1440 分钟）的供应链闸门，裸包名会解析成**「满 24 小时的最新版」**而不是 `latest`——实测 2026-10-29 发完 `0.2.1` 之后 `pnpm add dsh-client-ui-model-seat` 装到的是 `0.1.2`。这不是一次性事故而是机制：`0.2.2` 发出去的当天，满一天的最新版仍然是 `0.2.1`，裸包名就解析到 `0.2.1`。要立刻装到最新，把版本写死（`@0.2.2`，pnpm 会把它记进 profile 的 `minimumReleaseAgeExclude`）；或者等一天再装。
 
 插件的 bundle 只往 profile 里插一行（`id: model-seat`），并以 `priority: -2` 注册它的座位，
 所以残留的任一原插件（`-1`）或内置控件（`0`）会被遮蔽，而不是撞在一起。
@@ -171,16 +171,17 @@ dsh 输入区的「模型 + 思考强度」控件。它由两个插件合并而�
     npm run e2e:dark     # 同一套断言，prefers-color-scheme: dark
     npm run check:all    # check + e2e + e2e:dark
     npm run live -- --url URL   # 同样的检查，跑在真实 dsh 里
-    npm run release 0.2.0       # 门禁 → npm → 提交 → 打标签 → 推送（见 CHANGELOG 规则）
+    npm run release 0.2.2       # 门禁 → npm → 提交 → 打标签 → 推送（见 CHANGELOG 规则）
 
-`npm run e2e` 把 `test/harness/` 挂在一个回环端口上，用 headless Edge 经 CDP 打开，分九节断言：
+`npm run e2e` 把 `test/harness/` 挂在一个回环端口上，用 headless Edge 经 CDP 打开，分十四节断言：
 双列卡片、指针停在 60 个模型上时高度不变、关掉再打开的确定性、跨 provider 查询、空查询提示
 （一个带内边距的 `.ms-empty`、零行）、思考面板（闪电按钮、动效常开、自有高度、顶底内缩相等、图标与文字的对比度）、
-滑块键盘路径、闪电按钮跳到最高档与回退、模型列八行下限、复位按钮、旧 fast 键已弃用、列头状态按钮回到双列、颜色面板热键、以及干净的 console。`--shot DIR` 会写出截图；
+减少动效分支、列头状态按钮回到双列、模型列八行下限、颜色面板热键、重载后闪电仍亮、换 origin 重启与新会话交接、
+同一行里有渠道徽标时前缀退让、以及干净的 console。`--shot DIR` 会写出截图；
 `--dump` 打印卡片盒模型与子元素。e2e 的 React 来自仓库里提交的 `test/vendor/` UMD 构建，
 所以新克隆无需外部目录、无需网络；`--vendor DIR` / `REACT_VENDOR=DIR` 可以覆盖。
 
-`lib/client.js` 是**手写**的 —— 3217 行单文件 bundle，没有构建步骤，因为 `dsh.client` 只接受一个
+`lib/client.js` 是**手写**的 —— 3671 行单文件 bundle，没有构建步骤，因为 `dsh.client` 只接受一个
 `./client` 入口。`tools/merge/gen-client.mjs` 当初从外壳 bundle 生成了第一稿，如今只作存档：
 不带 `--force` 它会拒绝运行，即便带了也会先把当前文件备份成 `lib/client.js.bak-gen-<timestamp>`。
 

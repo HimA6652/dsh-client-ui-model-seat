@@ -45,7 +45,7 @@ jobs:
       - name: Installed checks
         run: npm run check
 
-      # 真实 Edge 里的九节断言；--shot 把每张卡片状态存下来，失败时也能看。
+      # 真实 Edge 里的十四节断言（含渠道徽标抑制前缀那一节）；--shot 把每张卡片状态存下来，失败时也能看。
       # 浅深两套都跑：卡片底色跟宿主走，只在一边成立的配色必须被拦住。
       # 失败时把报告里最要紧的几行提升成 annotation：公开仓库里任何人（包括没登录的
       # 维护者）都能从 check-run 的 annotations API 读到失败原因，不必去翻日志。

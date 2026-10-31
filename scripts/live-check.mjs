@@ -263,8 +263,26 @@ try {
       '  var model = document.querySelector(' + q(TRIGGER) + ')',
       '  var effort = document.querySelector(' + q(EFFORT) + ')',
       '  var root = document.querySelector("[data-model-seat=root]")',
+      '  // A channel plugin (dsh-providers-hub) prints the provider it routed to in',
+      '  // the sibling conversation.input.right slot, and the seat then drops its own',
+      '  // prefix so the row names one provider instead of two. Read that badge here so',
+      '  // the assertion below can tell "no prefix because the channel has it" apart',
+      '  // from a regression that simply lost the prefix.',
+      '  // Walk up the same way the bundle does (at most four ancestors): the badge',
+      '  // sits in a sibling slot, not under the trigger, so only a shared ancestor',
+      '  // can see both.',
+      '  var slotSel = \'[data-slot="conversation.input.right"]\'',
+      '  var row = model === null ? null : model.parentElement',
+      '  var hubSlot = null',
+      '  for (var step = 0; step < 4 && row !== null; step += 1) {',
+      '    hubSlot = typeof row.querySelector === "function" ? row.querySelector(slotSel) : null',
+      '    if (hubSlot !== null) break',
+      '    row = row.parentElement || null',
+      '  }',
       '  return {',
       '    model: model === null ? null : model.textContent.trim(),',
+      '    provider: model === null ? null : ((model.querySelector(".gptm-triggerProvider") || {}).textContent || null),',
+      '    hubBadge: hubSlot === null ? false : hubSlot.querySelector(".dim-jh-badge, .dim-jh-badgePending") !== null,',
       '    effort: effort === null ? null : effort.textContent.trim(),',
       '    build: root === null ? null : root.getAttribute("data-build"),',
       '    sheets: document.querySelectorAll("#dsh-model-seat-style").length,',
@@ -287,10 +305,17 @@ try {
   // fixture suite is where the slider and the pane are exercised.
   const effortOffered = triggers.effort !== null
   check('the sheet is injected once', triggers.sheets === 1, String(triggers.sheets))
+  // B prints "provider/model" on the trigger, and the seat still does - unless a
+  // channel plugin already names the provider in the same composer row. Then the
+  // prefix steps aside and the trigger is the model alone. Either shape is correct,
+  // so the assertion accepts both and fails only when neither holds: a prefix that
+  // vanished with no badge to justify it, or one that refuses to stand down.
   check(
-    'the trigger names provider and model, as in B',
-    typeof triggers.model === 'string' && triggers.model.includes('/'),
-    String(triggers.model),
+    'the trigger names the provider, or the channel row already does',
+    triggers.hubBadge === true
+      ? triggers.provider === null && typeof triggers.model === 'string' && triggers.model !== ''
+      : typeof triggers.model === 'string' && triggers.model.includes('/'),
+    JSON.stringify({ model: triggers.model, provider: triggers.provider, hubBadge: triggers.hubBadge }),
   )
 
   const modelPoint = await centerOf(TRIGGER)
@@ -381,6 +406,9 @@ try {
         '  return {',
         '    slider: slider !== null,',
         '    search: document.querySelector(".ms-col[data-col=models] .ms-search") !== null,',
+        '    empty: document.querySelector(".gptm-note") !== null,',
+        '    open: document.querySelector(' + q(CARD) + ') !== null,',
+        '    paneName: (function () { var e = document.querySelector(' + q(CARD) + '); return e === null ? null : e.getAttribute("data-pane") })(),',
         '    now: slider === null ? null : slider.getAttribute("aria-valuenow"),',
         '    max: slider === null ? null : slider.getAttribute("aria-valuemax"),',
         '    bolt: (function () { var b = document.querySelector(' + q(BOLT) + '); return b === null ? null : { pressed: b.getAttribute("aria-pressed"), label: b.getAttribute("aria-label"), fill: getComputedStyle(b.querySelector(".gptm-boltFill")).opacity, outline: getComputedStyle(b.querySelector(".gptm-boltOutline")).opacity } })(),' +
@@ -402,33 +430,52 @@ try {
         '})()',
       ]),
     )
-    check('the effort trigger opens the thinking pane', pane.slider === true, JSON.stringify(pane))
-    check('the thinking pane carries no model search box', pane.search === false, JSON.stringify(pane))
-    // 0.2.1: the bolt is back on the head. The live check reads it, it does not
-    // press it: a press publishes a reasoning effort to the account directory.
+    // A live directory may list a model with reasoning metadata but no level list,
+    // and the pane then says so instead of drawing a slider (lib/client.js: the
+    // `levels.length === 0` branch). Both shapes are correct, so read which one the
+    // environment is in and assert the matching half. Demanding a slider here was
+    // the bug: `triggers.effort` is non-null as soon as the adapter declares any
+    // effort at all, so an account with no levels failed eight checks that had
+    // nothing to look at.
+    const levelsDeclared = pane.slider === true
     check(
-      'the bolt is offered and starts unpressed',
-      pane.bolt !== null && typeof pane.bolt === 'object' && pane.bolt.pressed === 'false' && pane.bolt.fill === '0' && pane.bolt.outline === '1',
-      JSON.stringify(pane.bolt),
+      levelsDeclared ? 'the effort trigger opens the thinking pane' : 'the effort trigger opens the pane and the pane states it has no levels',
+      levelsDeclared ? pane.paneName === 'thinking' : pane.open === true && pane.paneName === 'thinking' && pane.empty === true,
+      JSON.stringify({ slider: pane.slider, open: pane.open, paneName: pane.paneName, empty: pane.empty }),
     )
-    check('the drift trail is always on', pane.trail !== null && Number(pane.trail) >= 0.99, String(pane.trail))
-    check(
-      'the particles drift at full strength',
-      pane.particles === 42 && pane.drift !== null && pane.drift.name === 'gptm-drift' && pane.drift.spin === '1' && pane.drift.running === 1,
-      JSON.stringify({ particles: pane.particles, drift: pane.drift }),
-    )
-    // Same branch as the fixture check: honour reduce, then come back.
-    const READ_MOTION =
-      '(function () { var p = document.querySelector(".gptm-particle"); return p === null ? null : { name: getComputedStyle(p).animationName, opacity: Number(getComputedStyle(p).opacity), running: p.getAnimations ? p.getAnimations().length : null } })()'
-    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, session)
-    await sleep(150)
-    const calm = await evaluate(READ_MOTION)
-    check('reduced motion stops the drift', calm !== null && calm.name === 'none', JSON.stringify(calm))
-    check('reduced motion parks the particles at 0.35', calm !== null && Math.abs(calm.opacity - 0.35) < 0.02, JSON.stringify(calm))
-    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] }, session)
-    await sleep(150)
-    const resumed = await evaluate(READ_MOTION)
-    check('the drift resumes when motion is allowed', resumed !== null && resumed.name === 'gptm-drift' && resumed.running === 1, JSON.stringify(resumed))
+    if (levelsDeclared) {
+      check('the thinking pane carries no model search box', pane.search === false, JSON.stringify(pane.search))
+      // 0.2.1: the bolt is back on the head. The live check reads it, it does not
+      // press it: a press publishes a reasoning effort to the account directory.
+      check(
+        'the bolt is offered and starts unpressed',
+        pane.bolt !== null && typeof pane.bolt === 'object' && pane.bolt.pressed === 'false' && pane.bolt.fill === '0' && pane.bolt.outline === '1',
+        JSON.stringify(pane.bolt),
+      )
+      check('the drift trail is always on', pane.trail !== null && Number(pane.trail) >= 0.99, String(pane.trail))
+      check(
+        'the particles drift at full strength',
+        pane.particles === 42 && pane.drift !== null && pane.drift.name === 'gptm-drift' && pane.drift.spin === '1' && pane.drift.running === 1,
+        JSON.stringify({ particles: pane.particles, drift: pane.drift }),
+      )
+      // Same branch as the fixture check: honour reduce, then come back.
+      const READ_MOTION =
+        '(function () { var p = document.querySelector(".gptm-particle"); return p === null ? null : { name: getComputedStyle(p).animationName, opacity: Number(getComputedStyle(p).opacity), running: p.getAnimations ? p.getAnimations().length : null } })()'
+      await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }, session)
+      await sleep(150)
+      const calm = await evaluate(READ_MOTION)
+      check('reduced motion stops the drift', calm !== null && calm.name === 'none', JSON.stringify(calm))
+      check('reduced motion parks the particles at 0.35', calm !== null && Math.abs(calm.opacity - 0.35) < 0.02, JSON.stringify(calm))
+      await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] }, session)
+      await sleep(150)
+      const resumed = await evaluate(READ_MOTION)
+      check('the drift resumes when motion is allowed', resumed !== null && resumed.name === 'gptm-drift' && resumed.running === 1, JSON.stringify(resumed))
+      check('the pane icon reads on the card surface', pane.contrast.reset >= 3, JSON.stringify(pane.contrast))
+      check('the bolt reads on the card surface', pane.contrast.bolt >= 3, JSON.stringify(pane.contrast))
+    } else {
+      check('the pane with no levels draws no slider and no particles', pane.particles === 0 && pane.trail === null && pane.bolt === null, JSON.stringify({ particles: pane.particles, trail: pane.trail, bolt: pane.bolt }))
+      check('the pane icon reads on the card surface', pane.contrast.reset >= 3, JSON.stringify(pane.contrast))
+    }
     check('the thinking pane keeps one frozen height', typeof pane.height === 'number', String(pane.height))
     check('the card shrinks to the thinking pane', pane.box.height < 300, JSON.stringify(pane.box))
     // 0.2.1: the frame is the pane's natural height, so the content sits inset
@@ -438,8 +485,6 @@ try {
       pane.inset !== null && pane.inset.top === pane.inset.bottom,
       JSON.stringify(pane.inset),
     )
-    check('the pane icon reads on the card surface', pane.contrast.reset >= 3, JSON.stringify(pane.contrast))
-    check('the bolt reads on the card surface', pane.contrast.bolt >= 3, JSON.stringify(pane.contrast))
     check('the pane model line reads on the card surface', pane.contrast.model >= 4.5, JSON.stringify(pane.contrast))
     // The defect the user reported: switching panes used to keep the columns'
     // frozen 420px on the shorter panel. Going back must restore both.
@@ -450,7 +495,7 @@ try {
     )
     check('switching back restores the two columns', backToColumns !== null && backToColumns.columns === true, JSON.stringify(backToColumns))
     check('the columns are taller than the pane was', backToColumns !== null && backToColumns.height > pane.box.height + 80, JSON.stringify([pane.box.height, backToColumns === null ? null : backToColumns.height]))
-    pane = Object.assign({}, pane, { backToColumns: backToColumns })
+    pane = Object.assign({}, pane, { backToColumns: backToColumns, levelsDeclared: levelsDeclared })
   } else {
     check('no effort trigger exists for a model with no levels', thinking.slider === false, JSON.stringify(thinking))
   }
